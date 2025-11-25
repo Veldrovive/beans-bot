@@ -36,3 +36,6 @@ class ConfigManager:
 
     def get_model_device(self) -> str:
         return self.config.get("model_device", "cpu")
+
+    def get_torch_cpu_threads(self) -> int:
+        return self.config.get("torch_cpu_threads", 1)

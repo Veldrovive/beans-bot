@@ -8,6 +8,7 @@ import numpy as np
 from dino_classifier import DinoFeatureExtractor, Classifier
 from enum import Enum
 import os
+import torch
 
 
 HIGH_CONFIDENCE_THRESHOLD = 0.68
@@ -47,6 +48,8 @@ class ClassifierCog(commands.Cog):
         self.bot = bot
         self.logger = logging.getLogger("ClassifierCog")
         self.logger.info("Initializing ClassifierCog...")
+        torch.set_num_threads(self.bot.config_manager.get_torch_cpu_threads())
+        self.logger.info(f"Setting torch cpu threads to {self.bot.config_manager.get_torch_cpu_threads()}")
         self.feature_extractor = DinoFeatureExtractor(hf_token=os.getenv("HF_TOKEN"), device=self.bot.config_manager.get_model_device())
         self.classifier = Classifier()
         try:

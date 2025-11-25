@@ -1,5 +1,6 @@
 {
   "model_device": "cpu",
+  "torch_cpu_threads": 1,
   "servers": {
     "1435668295410782290": {
       "name": "Real Server",
