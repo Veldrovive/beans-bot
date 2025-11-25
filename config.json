@@ -1,0 +1,30 @@
+{
+  "servers": {
+    "1435668295410782290": {
+      "name": "Real Server",
+      "bot_channel_id": 1441539591856197684,
+      "student_role_id": 1435671205293064254,
+      "classifier_conf": {
+        "enabled_channels": [
+          1441539591856197684,
+          1435668994530214089
+        ],
+        "manual_trigger_reaction": "🐱",
+        "allow_none_label_for_anyone": false
+      }
+    },
+    "1437111063811330234": {
+      "name": "Test Server",
+      "bot_channel_id": 1437111390644080670,
+      "student_role_id": 1437112395204919336,
+      "classifier_conf": {
+        "enabled_channels": [
+          1437111390644080670,
+          1437111064603918461
+        ],
+        "manual_trigger_reaction": "🐱",
+        "allow_none_label_for_anyone": false
+      }
+    }
+  }
+}

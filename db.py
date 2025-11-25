@@ -1,6 +1,9 @@
 import sqlite3
 import json
+import logging
 from typing import Any, Optional, List, Tuple
+
+logger = logging.getLogger(__name__)
 
 class DB:
     """
@@ -20,7 +23,7 @@ class DB:
                     value TEXT NOT NULL
                 )
             ''')
-        print("Database initialized.")
+        logger.info("Database initialized.")
 
     def _connect(self) -> sqlite3.Connection:
         """Creates and returns a new database connection."""

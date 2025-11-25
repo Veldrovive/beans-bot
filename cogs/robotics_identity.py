@@ -2,6 +2,7 @@ from discord.ext import commands
 from typing import Optional, List, Tuple
 import discord
 import asyncio
+import logging
 
 class RoleNameCog(commands.Cog, name="Robotics Identity"):
     required_positive_reactions = 1
@@ -11,6 +12,7 @@ class RoleNameCog(commands.Cog, name="Robotics Identity"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.logger = logging.getLogger("RoboticsIdentity")
         self.role_change_message_table_name = "role_change_messages"
 
         with self.bot.db.connect() as con:
@@ -129,7 +131,7 @@ class RoleNameCog(commands.Cog, name="Robotics Identity"):
         """
         record = self.recall_role_change_poll_message(change_poll_message_id)
         if record is None:
-            print('Not a role change poll message.')
+            self.logger.debug('Not a role change poll message.')
             return  # Not a tracked message
         guild_id, channel_id, original_message_id, change_initiator_user_id, new_adjective, active = record
         # Get the message object
@@ -138,11 +140,11 @@ class RoleNameCog(commands.Cog, name="Robotics Identity"):
         try:
             message = await channel.fetch_message(change_poll_message_id)
         except discord.NotFound:
-            print(f"Message ID {change_poll_message_id} not found in channel ID {channel_id}.")
+            self.logger.warning(f"Message ID {change_poll_message_id} not found in channel ID {channel_id}.")
             return
 
         if active == 0:
-            print('Poll is no longer active.')
+            self.logger.info('Poll is no longer active.')
             return  # Poll is inactive
 
         # Count the number of unique users who reacted positively and negatively
@@ -166,9 +168,13 @@ class RoleNameCog(commands.Cog, name="Robotics Identity"):
         # Check if the poll has passed
         if votes_needed <= 0:
             # Change the role adjective
-            role = guild.get_role(self.bot.student_role_id)
+            student_role_id = self.bot.config_manager.get_student_role_id(guild.id)
+            if student_role_id is None:
+                self.logger.warning(f"Student role ID not configured for guild {guild.id}")
+                return
+            role = guild.get_role(student_role_id)
             if role is None:
-                print("Role not found.")
+                self.logger.warning("Role not found.")
                 return
             await role.edit(name=f"{new_adjective} Robotics Student")
             # Mark the poll as inactive
@@ -216,6 +222,12 @@ class RoleNameCog(commands.Cog, name="Robotics Identity"):
     )
     async def robrole(self, ctx: commands.Context, *, new_adjective: str):
         """Starts a poll to change your robotics student role adjective."""
+        # Check if we are in the correct channel
+        bot_channel_id = self.bot.config_manager.get_bot_channel_id(ctx.guild.id)
+        if bot_channel_id and ctx.channel.id != bot_channel_id:
+            # await ctx.send(f"Please use this command in <#{bot_channel_id}>.")
+            return
+
         sanitized_adjective = self.validate_adjective(new_adjective)
         if sanitized_adjective is None:
             await ctx.send("Invalid adjective. Please provide a non-empty adjective less than 20 characters.")

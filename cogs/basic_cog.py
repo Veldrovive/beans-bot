@@ -1,8 +1,10 @@
 from discord.ext import commands
+import logging
 
 class BasicCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.logger = logging.getLogger("BasicCog")
 
     @commands.command(
         name='ping',
