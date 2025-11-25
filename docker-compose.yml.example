@@ -1,0 +1,10 @@
+services:
+  bot:
+    build: .
+    volumes:
+      - ./db.sqlite3:/app/db.sqlite3
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - HF_TOKEN=${HF_TOKEN}
+      - DB_FILE=db.sqlite3
+    restart: unless-stopped

@@ -33,3 +33,6 @@ class ConfigManager:
         if server_config:
             return server_config.get("student_role_id")
         return None
+
+    def get_model_device(self) -> str:
+        return self.config.get("model_device", "cpu")

@@ -21,29 +21,6 @@ class PredictionConfidence(Enum):
 ALLOW_NONE_LABEL_FOR_ANYONE = False
 
 class ClassifierCog(commands.Cog):
-    # scripts = {
-    #     ("andy", PredictionConfidence.HIGH): "\"Oh wacky tobacky this is Andy!\" - Connor",
-    #     ("andy", PredictionConfidence.HIGH): "Andy! Go to sleep!",
-    #     ("andy", PredictionConfidence.HIGH): "Take your bets if Andy's leaving FRB before it's tomorrow",
-
-    #     # ("bean", HIGH_CONFIDENCE_THRESHOLD): "BEAN!!!",
-    #     ("bean", PredictionConfidence.HIGH): "Send bean pics",
-    #     ("bean", PredictionConfidence.HIGH): "Hey, when are you doing playdate?",
-
-    #     ("harvey", PredictionConfidence.HIGH): "Harvey! Outside of a couch! It's more likely than you think.",
-    #     ("harvey", PredictionConfidence.HIGH): "Oh Harvey, please stop being a menace at night",
-
-    #     ("levi", PredictionConfidence.HIGH): "It's the perfect princess Laverne!",
-    #     # ("levi", HIGH_CONFIDENCE_THRESHOLD): "",
-
-    #     ("merlin", PredictionConfidence.HIGH): "Watch your feet Merlin's here",
-    #     ("merlin", PredictionConfidence.HIGH): "STINKY!",
-    #     ("merlin", PredictionConfidence.HIGH): "Get put in air jail!",
-
-    #     (None, PredictionConfidence.HIGH): "AWWWW it's {name_1}!",
-    #     (None, PredictionConfidence.MID): "Could it be! Is it {name_1}?! Or wait is it {name_2}?",
-    #     (None, PredictionConfidence.LOW): "Who is this man? {name_1}?"
-    # }
     scripts = [
         ("andy", PredictionConfidence.HIGH, "\"Oh wacky tobacky this is Andy!\" - Connor"),
         ("andy", PredictionConfidence.HIGH, "Andy! Go to sleep!"),
@@ -70,7 +47,7 @@ class ClassifierCog(commands.Cog):
         self.bot = bot
         self.logger = logging.getLogger("ClassifierCog")
         self.logger.info("Initializing ClassifierCog...")
-        self.feature_extractor = DinoFeatureExtractor(hf_token=os.getenv("HF_TOKEN"))
+        self.feature_extractor = DinoFeatureExtractor(hf_token=os.getenv("HF_TOKEN"), device=self.bot.config_manager.get_model_device())
         self.classifier = Classifier()
         try:
             self.classifier.load()

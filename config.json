@@ -1,4 +1,5 @@
 {
+  "model_device": "cpu",
   "servers": {
     "1435668295410782290": {
       "name": "Real Server",
