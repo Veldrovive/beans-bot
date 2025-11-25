@@ -7,6 +7,7 @@ from PIL import Image
 import numpy as np
 from dino_classifier import DinoFeatureExtractor, Classifier
 from enum import Enum
+import os
 
 
 HIGH_CONFIDENCE_THRESHOLD = 0.68
@@ -69,7 +70,7 @@ class ClassifierCog(commands.Cog):
         self.bot = bot
         self.logger = logging.getLogger("ClassifierCog")
         self.logger.info("Initializing ClassifierCog...")
-        self.feature_extractor = DinoFeatureExtractor()
+        self.feature_extractor = DinoFeatureExtractor(hf_token=os.getenv("HF_TOKEN"))
         self.classifier = Classifier()
         try:
             self.classifier.load()

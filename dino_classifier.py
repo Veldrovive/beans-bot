@@ -10,6 +10,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import accuracy_score, log_loss, confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 import cv2
+from huggingface_hub import login
 
 # Constants
 CKPT = "facebook/dinov3-vits16-pretrain-lvd1689m"
@@ -19,10 +20,21 @@ MODELS_DIR = PROJECT_ROOT / "models"
 MODELS_DIR.mkdir(exist_ok=True)
 
 class DinoFeatureExtractor:
-    def __init__(self, checkpoint=CKPT, device="mps"):
+    def __init__(self, checkpoint=CKPT, device="mps", hf_token=None):
         self.device = device
-        self.processor = AutoImageProcessor.from_pretrained(checkpoint)
-        self.model = AutoModel.from_pretrained(checkpoint, dtype=torch.bfloat16, device_map=device)
+        try:
+            self.processor = AutoImageProcessor.from_pretrained(checkpoint)
+            self.model = AutoModel.from_pretrained(checkpoint, dtype=torch.bfloat16, device_map=device)
+        except OSError as e:
+            # This means the model is gated. We need to log in to access it.
+            print("Model is gated. Logging in...")
+            if hf_token is not None:
+                login(hf_token)
+            else:
+                raise e
+            self.processor = AutoImageProcessor.from_pretrained(checkpoint)
+            self.model = AutoModel.from_pretrained(checkpoint, dtype=torch.bfloat16, device_map=device)
+        
         self.model.eval()
 
     def extract_features(self, images):
