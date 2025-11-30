@@ -4,6 +4,7 @@ test_test_cat_data/
 dinov3_vits16_*
 # The real docker-compose may have secrets, so we ignore it
 docker-compose.yml
+docker_db/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
