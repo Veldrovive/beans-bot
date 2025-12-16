@@ -34,7 +34,7 @@ servers:
         emotions:
           model_path: "emotions"
           auto_respond_channels: [1441539591856197684]
-          manual_trigger_reaction: "😊"
+          manual_trigger_reaction: "😄"
           confidence_thresholds: {HIGH: 0.68, MID: 0.4, LOW: 0.0}
           select_random_prob: 0.4  # Alternative is select the script used the least recently
           scripts:
