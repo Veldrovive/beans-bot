@@ -5,6 +5,8 @@ dinov3_vits16_*
 # The real docker-compose may have secrets, so we ignore it
 docker-compose.yml
 docker_db/
+classifier/cache/
+classifier/datasets/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
