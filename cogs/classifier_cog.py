@@ -16,7 +16,7 @@ from collections import OrderedDict
 import hashlib
 import traceback
 
-MODEL_DIR = Path(__file__).parent.parent / "classifier" / "models"
+MODEL_DIR = Path(__file__).parent / "classifier" / "models"
 
 class ClassifierCog(commands.Cog):
     def __init__(self, bot: commands.Bot):

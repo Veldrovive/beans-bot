@@ -7,6 +7,7 @@ import time
 import asyncio
 from pathlib import Path
 import logging
+import json
 
 from db import DB
 from cogs.basic_cog import BasicCog
@@ -44,7 +45,9 @@ class Bot(commands.Bot):
 
         super().__init__(command_prefix='!', intents=intents)
 
-        self.config_manager = ConfigManager()
+        self.config_manager = ConfigManager(config_file=config_path)
+        print(f"Loading config from {config_path}")
+        print(f"****************\nConfig: {json.dumps(self.config_manager.config, indent=2)}\n****************")
 
         self.db = DB(DB_FILE)
 

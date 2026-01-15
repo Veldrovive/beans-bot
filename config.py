@@ -1,16 +1,17 @@
 import json
+from pathlib import Path
 import os
 from typing import Dict, Any, Optional
 import yaml
 from typing import List
 
 class ConfigManager:
-    def __init__(self, config_file: str = 'config.yaml'):
+    def __init__(self, config_file: Path = 'config.yaml'):
         self.config_file = config_file
         # Check we have a json or yaml config file
-        if self.config_file.endswith(".json"):
+        if self.config_file.suffix == ".json":
             self.config = self.load_json_config()
-        elif self.config_file.endswith(".yaml"):
+        elif self.config_file.suffix == ".yaml":
             self.config = self.load_yaml_config()
         else:
             raise ValueError("Config file must be a json or yaml file.")
