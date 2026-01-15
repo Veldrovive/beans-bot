@@ -14,6 +14,7 @@ from typing import Optional
 import datetime
 from collections import OrderedDict
 import hashlib
+import traceback
 
 MODEL_DIR = Path(__file__).parent.parent / "classifier" / "models"
 
@@ -272,7 +273,8 @@ class ClassifierCog(commands.Cog):
             self._mark_message_processed(message.id, classifier_name, guild_id, message.channel.id)
             self.logger.info(f"Replied to message {message.id} with script: {selected_script}")
         except Exception as e:
-            self.logger.error(f"Failed to send message: {e}")
+            full_traceback_string = traceback.format_exc()
+            self.logger.error(f"Failed to send message: {full_traceback_string}")
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
