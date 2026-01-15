@@ -29,7 +29,7 @@ servers:
             - { priority: 10, label: "merlin", confidence: "HIGH", text: "Get put in air jail!" }
             - { priority: 10, label: "merlin", confidence: "HIGH", text: "He demand the pank!" }
             - { priority:  0, label:    "ANY", confidence: "HIGH", text: "AWWWW it's {cats_label_1}!" }
-            - { priority:  0, label:    "ANY", confidence:  "MID", text: "Could it be! Is it {cats_label_1}?! Or wait is it {label_2}?" }
+            - { priority:  0, label:    "ANY", confidence:  "MID", text: "Could it be! Is it {cats_label_1}?! Or wait is it {cats_label_2}?" }
             - { priority:  0, label:    "ANY", confidence:  "LOW", text: "Who is this man? {cats_label_1}?" }
         emotions:
           model_path: "emotions"
