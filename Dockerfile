@@ -10,4 +10,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Command to run the bot
-CMD ["python", "main.py", "--config", "configs/config_prod.yaml"]
+CMD ["python", "main.py", "configs/config_prod.yaml"]
