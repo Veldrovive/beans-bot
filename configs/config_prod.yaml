@@ -46,48 +46,38 @@ servers:
             - { priority:  0, label:   "ANY", confidence: "HIGH", text: "Whoof, that's {emotions_label_1}!"}
             - { priority:  0, label:   "ANY", confidence:  "MID", text: "Could it be! Is it {emotions_label_1}?! Or wait is it {emotions_label_2}?"}
             - { priority:  0, label:   "ANY", confidence:  "LOW", text: "Someone's feeling {emotions_label_1}? Or is it {emotions_label_2}?"}
-  1437111063811330234:
-    name: "Test Server"
-    active: true
-    bot_channel_id: 1437111390644080670
-    student_role_id: 1437112395204919336
-    classifier_confs:
-      models:
-        cats:
-          model_path: "cats"
-          auto_respond_channels: [1437111390644080670]
-          manual_trigger_reaction: "🐱"
-          confidence_thresholds: {HIGH: 0.68, MID: 0.4, LOW: 0.0}
-          select_random_prob: 0.0  # Alternative is select the script used the least recently
-          scripts:
-            - { priority: 10, label:   "andy", confidence: "HIGH", text: "\"Oh wacky tobacky this is Andy!\" - Connor" }
-            - { priority: 10, label:   "andy", confidence: "HIGH", text: "Andy! Go to sleep!" }
-            - { priority: 10, label:   "andy", confidence: "HIGH", text: "Take your bets if Andy's leaving FRB before it's tomorrow" }
-            - { priority: 10, label:   "bean", confidence: "HIGH", text: "Send bean pics" }
-            - { priority: 10, label:   "bean", confidence: "HIGH", text: "Hey, when are you doing playdate?" }
-            - { priority: 10, label: "harvey", confidence: "HIGH", text: "Harvey! Outside of a couch! It's more likely than you think." }
-            - { priority: 10, label: "harvey", confidence: "HIGH", text: "Oh Harvey, please stop being a menace at night" }
-            - { priority: 10, label:   "levi", confidence: "HIGH", text: "It's the perfect princess Laverne!" }
-            - { priority: 10, label: "merlin", confidence: "HIGH", text: "Watch your feet Merlin's here" }
-            - { priority: 10, label: "merlin", confidence: "HIGH", text: "STINKY!" }
-            - { priority: 10, label: "merlin", confidence: "HIGH", text: "Get put in air jail!" }
-            - { priority: 10, label: "merlin", confidence: "HIGH", text: "He demand the pank!" }
-            - { priority:  0, label:    "ANY", confidence: "HIGH", text: "AWWWW it's {cats_label_1}!" }
-            - { priority:  0, label:    "ANY", confidence:  "MID", text: "Could it be! Is it {cats_label_1}?! Or wait is it {label_2}?" }
-            - { priority:  0, label:    "ANY", confidence:  "LOW", text: "Who is this man? {cats_label_1}?" }
-        emotions:
-          model_path: "emotions"
-          auto_respond_channels: [1437111390644080670]
-          manual_trigger_reaction: "😄"
-          confidence_thresholds: {HIGH: 0.68, MID: 0.4, LOW: 0.0}
-          select_random_prob: 0.0  # Alternative is select the script used the least recently
-          scripts:
-            - { priority: 10, label:  "angy", confidence: "HIGH", text: "Oh? Somebody is angy!" }
-            - { priority: 10, label: "needy", confidence: "HIGH", text: "Looks like someone needs attention!" }
-            - { priority: 10, label:  "eepy", confidence: "HIGH", text: "Time for sleep (˘o˘ )"}
-            - { priority: 10, label: "hungy", confidence: "HIGH", text: "FOOD! GIVE!"}
-            - { priority: 10, label:  "andy", confidence: "HIGH", text: "Feelin a bit andy today."}
-            - { priority:  0, label:   "ANY", confidence: "HIGH", text: "Whoof, that's {emotions_label_1}!"}
-            - { priority:  0, label:   "ANY", confidence:  "MID", text: "Could it be! Is it {emotions_label_1}?! Or wait is it {emotions_label_2}?"}
-            - { priority:  0, label:   "ANY", confidence:  "LOW", text: "Someone's feeling {emotions_label_1}? Or is it {emotions_label_2}?"}
-      
+    council_of_teds_confs:
+      nay_vote_emoji: ":honse:"
+      council_members:
+        ted:
+          internal_name: "Ted"
+          ted_id: 1
+          council_name: "The First True Ted"
+          epithets: ["The Only"]
+          words: "Unicus"
+          user_id: 255516285985619970
+          crest_emoji: ":unicus:"
+        aidan:
+          internal_name: "Aidan"
+          ted_id: 2
+          council_name: "The Second True Ted"
+          epithets: ["The Botfather", "The Usurper"]
+          words: "Dempseram"
+          user_id: 728600387501686836
+          crest_emoji: ":dempseram:"
+        andy:
+          internal_name: "Andy"
+          ted_id: 3
+          council_name: "The Third True Ted?"
+          epithets: ["Him of the Lab"]
+          words: "Fortasse"
+          user_id: 1405215475688018002
+          crest_emoji: ":fortasse:"
+        jace:
+          internal_name: "Jace"
+          ted_id: 4
+          council_name: "The Last True Ted"
+          epithets: ["The Final"]
+          words: "Terminus"
+          user_id: 588908461149126656
+          crest_emoji: ":terminus:"

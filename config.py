@@ -67,3 +67,8 @@ class ConfigManager:
         server_config = self.get_server_config(guild_id)
         if server_config:
             return server_config.get("classifier_confs")
+
+    def get_council_of_teds_config(self, guild_id: int) -> Optional[Dict[str, Any]]:
+        server_config = self.get_server_config(guild_id)
+        if server_config:
+            return server_config.get("council_of_teds_confs")

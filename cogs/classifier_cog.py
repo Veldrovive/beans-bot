@@ -5,7 +5,7 @@ import io
 import random
 from PIL import Image
 import numpy as np
-from classifier.dino_classifier import DinoFeatureExtractor, Classifier
+from cogs.classifier.dino_classifier import DinoFeatureExtractor, Classifier
 from enum import Enum
 import os
 import torch
