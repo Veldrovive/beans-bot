@@ -90,8 +90,11 @@ servers:
       jailed_role_id: 1469122341496688790
       on_jailed_scripts:
         - "Hark! {jailed_user} has been sent to the stocks for heinous speech!"
+        - "Hah! Mock {jailed_user} thus! Forsooth, unto the stocks they hath been led!"
       humiliate_scripts:
         - "Silence {jailed_user}! I throw a tomato at thee!"
+        - "Take a tomato unto thine head!"
+        - "Halt thy prattling!"
       assult_innocent_scripts:
         - "HALT {reacting_user}! You have tomatoed the innocent {attacked_user}! I will remember this!"
       already_in_jail_scripts:
