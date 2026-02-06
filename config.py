@@ -4,6 +4,7 @@ import os
 from typing import Dict, Any, Optional
 import yaml
 from typing import List
+from contextlib import contextmanager
 
 class ConfigManager:
     def __init__(self, config_file: Path = 'config.yaml'):
@@ -15,6 +16,21 @@ class ConfigManager:
             self.config = self.load_yaml_config()
         else:
             raise ValueError("Config file must be a json or yaml file.")
+        
+        assert "lazy_store_folder" in self.config, "Config file must contain lazy_store_folder."
+        self.data_store_path = Path(self.config.get("lazy_store_folder"))
+        self.data_store_path.mkdir(parents=True, exist_ok=True)
+
+    def get_data_store_path(self, server_id: int, cog_id: str) -> Path:
+        return self.data_store_path / str(server_id) / cog_id
+
+    @contextmanager
+    def open_data_store(self, server_id: int, cog_id: str, filename: str, mode: str = "r"):
+        cog_path = self.get_data_store_path(server_id, cog_id)
+        cog_path.mkdir(parents=True, exist_ok=True)
+        file_path = cog_path / filename
+        with open(file_path, mode) as f:
+            yield f
 
     def load_json_config(self) -> Dict[str, Any]:
         if not os.path.exists(self.config_file):
@@ -73,3 +89,8 @@ class ConfigManager:
         server_config = self.get_server_config(guild_id)
         if server_config:
             return server_config.get("council_of_teds_confs")
+
+    def get_jail_config(self, guild_id: int) -> Optional[Dict[str, Any]]:
+        server_config = self.get_server_config(guild_id)
+        if server_config:
+            return server_config.get("jail_confs")

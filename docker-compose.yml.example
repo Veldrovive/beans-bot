@@ -3,8 +3,10 @@ services:
     build: .
     volumes:
       - ./db.sqlite3:/app/db.sqlite3
+      - ./data:/app/data
     environment:
       - BOT_TOKEN=${BOT_TOKEN}
       - HF_TOKEN=${HF_TOKEN}
       - DB_FILE=db.sqlite3
+      - LAZY_STORE_FOLDER=data
     restart: unless-stopped

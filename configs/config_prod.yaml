@@ -1,5 +1,6 @@
 model_device: "cpu"
 torch_cpu_threads: 1
+lazy_store_folder: "./data"
 
 servers:
   1435668295410782290:
@@ -81,3 +82,19 @@ servers:
           words: "Terminus"
           user_id: 588908461149126656
           crest_emoji: ":terminus:"
+    jail_confs:
+      jail_emoji: "tojail"
+      tomato_emoji: "🍅"
+      to_jail_threshold: 5
+      jail_length_ms: 86400000  # 24 hours in milliseconds
+      jailed_role_id: 1469122341496688790
+      on_jailed_scripts:
+        - "Hark! {jailed_user} has been sent to the stocks for heinous speech!"
+      humiliate_scripts:
+        - "Silence {jailed_user}! I throw a tomato at thee!"
+      assult_innocent_scripts:
+        - "HALT {reacting_user}! You have tomatoed the innocent {attacked_user}! I will remember this!"
+      already_in_jail_scripts:
+        - "Alas! {jailed_user} is already in jail! How can they be double jailed?"
+      release_scripts:
+        - "Alright, {jailed_user}. You've served your time. Don't let it happen again."

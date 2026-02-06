@@ -13,6 +13,7 @@ from db import DB
 from cogs.basic_cog import BasicCog
 from cogs.robotics_identity import RoleNameCog
 from cogs.classifier_cog import ClassifierCog
+from cogs.jail_cog import JailCog
 # from cogs.council_of_teds_cog import CouncilOfTedsCog
 
 from config import ConfigManager
@@ -61,6 +62,7 @@ class Bot(commands.Bot):
         await self.add_cog(BasicCog(self))
         await self.add_cog(RoleNameCog(self))
         await self.add_cog(ClassifierCog(self))
+        await self.add_cog(JailCog(self))
         # await self.add_cog(CouncilOfTedsCog(self))
 
 

@@ -1,5 +1,6 @@
 model_device: "cpu"
 torch_cpu_threads: 1
+lazy_store_folder: "./data"
 
 servers:
   1437111063811330234:
@@ -7,6 +8,7 @@ servers:
     active: true
     bot_channel_id: 1437111390644080670
     student_role_id: 1437112395204919336
+
     classifier_confs:
       models:
         cats:
@@ -81,5 +83,32 @@ servers:
           words: "Terminus"
           user_id: 588908461149126656
           crest_emoji: ":terminus:"
-
-        
+      mother_of_bean:
+        role_id: TODO
+        yay_vote_emoji: TODO
+      miscreants:
+        allow_torch: true
+        torch_emoji: ":fire:"
+        yay_vote_emoji: TODO
+      others:
+        yay_vote_emoji: TODO
+        nay_vote_emoji: TODO
+    jail_confs:
+      jail_emoji: "tojail"
+      tomato_emoji: "🍅"
+      to_jail_threshold: 1
+      jail_length_ms: 1000 #86400000  # 24 hours in milliseconds
+      jailed_role_id: 1469116763257176247
+      on_jailed_scripts:
+        - "Hark! {jailed_user} has been sent to the stocks for heinous speech!"
+      humiliate_scripts:
+        - "Silence {jailed_user}! I throw a tomato at thee!"
+      assult_innocent_scripts:
+        - "HALT {reacting_user}! You have tomatoed the innocent {attacked_user}! I will remember this!"
+      already_in_jail_scripts:
+        - "Alas! {jailed_user} is already in jail! How can they be double jailed?"
+      release_scripts:
+        - "Alright, {jailed_user}. You've served your time. Don't let it happen again."
+      
+      
+      
