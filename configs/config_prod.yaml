@@ -101,3 +101,7 @@ servers:
         - "Alas! {jailed_user} is already in jail! How can they be double jailed?"
       release_scripts:
         - "Alright, {jailed_user}. You've served your time. Don't let it happen again."
+      scot_free_scripts:
+        - "What are you doing in the stocks {jailed_user}? You're free to go."
+      forgotten_prisoner_scripts:
+        - "You're not on the lists {jailed_user}. Well you must be here for a reason. Back in the stocks!"
