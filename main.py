@@ -42,6 +42,7 @@ class Bot(commands.Bot):
         intents = discord.Intents.default()
         intents.message_content = True  # Required to read message content
         intents.reactions = True      # Required to see reactions
+        intents.members = True        # Required to fetch members
         # intents = discord.Intents.all()  # Enable all intents for simplicity
 
         super().__init__(command_prefix='!', intents=intents)

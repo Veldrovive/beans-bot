@@ -97,7 +97,7 @@ servers:
       jail_emoji: "tojail"
       tomato_emoji: "🍅"
       to_jail_threshold: 1
-      jail_length_ms: 1000 #86400000  # 24 hours in milliseconds
+      jail_length_ms: 10000 #86400000  # 24 hours in milliseconds
       jailed_role_id: 1469116763257176247
       on_jailed_scripts:
         - "Hark! {jailed_user} has been sent to the stocks for heinous speech!"
@@ -109,6 +109,10 @@ servers:
         - "Alas! {jailed_user} is already in jail! How can they be double jailed?"
       release_scripts:
         - "Alright, {jailed_user}. You've served your time. Don't let it happen again."
+      scot_free_scripts:
+        - "What are you doing in the stocks {jailed_user}? You're free to go."
+      forgotten_prisoner_scripts:
+        - "You're not on the lists {jailed_user}. Well you must be here for a reason. Back in the stocks!"
       
       
       
