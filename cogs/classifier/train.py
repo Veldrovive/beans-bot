@@ -100,7 +100,7 @@ def main():
             label_image_path = train_path / label
             image_paths = list(label_image_path.iterdir())
             for image_path in tqdm.tqdm(image_paths):
-                if image_path.is_file():
+                if image_path.is_file() and image_path.stem[0] not in ["_", "."]:
                     embedding = _extract_embedding(image_path, feature_extractor, embedding_cache)
                     X_train.append(embedding.squeeze())
                     label_index = label_to_index[label]
