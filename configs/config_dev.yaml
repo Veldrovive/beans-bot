@@ -18,21 +18,23 @@ servers:
           confidence_thresholds: {HIGH: 0.68, MID: 0.4, LOW: 0.0}
           select_random_prob: 0.0  # Alternative is select the script used the least recently
           scripts:
-            - { priority: 10, label:   "andy", confidence: "HIGH", text: "\"Oh wacky tobacky this is Andy!\" - Connor" }
-            - { priority: 10, label:   "andy", confidence: "HIGH", text: "Andy! Go to sleep!" }
-            - { priority: 10, label:   "andy", confidence: "HIGH", text: "Take your bets if Andy's leaving FRB before it's tomorrow" }
-            - { priority: 10, label:   "bean", confidence: "HIGH", text: "Send bean pics" }
-            - { priority: 10, label:   "bean", confidence: "HIGH", text: "Hey, when are you doing playdate?" }
-            - { priority: 10, label: "harvey", confidence: "HIGH", text: "Harvey! Outside of a couch! It's more likely than you think." }
-            - { priority: 10, label: "harvey", confidence: "HIGH", text: "Oh Harvey, please stop being a menace at night" }
-            - { priority: 10, label:   "levi", confidence: "HIGH", text: "It's the perfect princess Laverne!" }
-            - { priority: 10, label: "merlin", confidence: "HIGH", text: "Watch your feet Merlin's here" }
-            - { priority: 10, label: "merlin", confidence: "HIGH", text: "STINKY!" }
-            - { priority: 10, label: "merlin", confidence: "HIGH", text: "Get put in air jail!" }
-            - { priority: 10, label: "merlin", confidence: "HIGH", text: "He demand the pank!" }
-            - { priority:  0, label:    "ANY", confidence: "HIGH", text: "AWWWW it's {cats_label_1}!" }
-            - { priority:  0, label:    "ANY", confidence:  "MID", text: "Could it be! Is it {cats_label_1}?! Or wait is it {cats_label_2}?" }
-            - { priority:  0, label:    "ANY", confidence:  "LOW", text: "Who is this man? {cats_label_1}?" }
+            - { priority: 10, label:     "andy", confidence: "HIGH", text: "\"Oh wacky tobacky this is Andy!\" - Connor" }
+            - { priority: 10, label:     "andy", confidence: "HIGH", text: "Andy! Go to sleep!" }
+            - { priority: 10, label:     "andy", confidence: "HIGH", text: "Take your bets if Andy's leaving FRB before it's tomorrow" }
+            - { priority: 10, label:     "bean", confidence: "HIGH", text: "Send bean pics" }
+            - { priority: 10, label:     "bean", confidence: "HIGH", text: "Hey, when are you doing playdate?" }
+            - { priority: 10, label:   "harvey", confidence: "HIGH", text: "Harvey! Outside of a couch! It's more likely than you think." }
+            - { priority: 10, label:   "harvey", confidence: "HIGH", text: "Oh Harvey, please stop being a menace at night" }
+            - { priority: 10, label:     "levi", confidence: "HIGH", text: "It's the perfect princess Laverne!" }
+            - { priority: 10, label:   "merlin", confidence: "HIGH", text: "Watch your feet Merlin's here" }
+            - { priority: 10, label:   "merlin", confidence: "HIGH", text: "STINKY!" }
+            - { priority: 10, label:   "merlin", confidence: "HIGH", text: "Get put in air jail!" }
+            - { priority: 10, label:   "merlin", confidence: "HIGH", text: "He demand the pank!" }
+            - { priority: 10, label:  "wrigley", confidence: "HIGH", text: "I can hear Wrigley purring from here!" }
+            - { priority: 10, label:  "wrigley", confidence: "HIGH", text: "Whoa, you got some big paws there Wrigley!" }
+            - { priority:  0, label:      "ANY", confidence: "HIGH", text: "AWWWW it's {cats_label_1}!" }
+            - { priority:  0, label:      "ANY", confidence:  "MID", text: "Could it be! Is it {cats_label_1}?! Or wait is it {cats_label_2}?" }
+            - { priority:  0, label:      "ANY", confidence:  "LOW", text: "Who is this man? {cats_label_1}?" }
         emotions:
           model_path: "emotions"
           auto_respond_channels: [1437111390644080670]

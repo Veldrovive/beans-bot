@@ -78,7 +78,7 @@ class JailCog(commands.Cog):
             
         server_config = self.bot.config_manager.get_jail_config(guild_id)
         if server_config is None:
-            self.logger.error(f"JailCogConfig not found for guild {guild_id}")
+            # self.logger.error(f"JailCogConfig not found for guild {guild_id}")
             return None
         return JailCogConfig(**server_config)
 
@@ -464,13 +464,13 @@ class JailCog(commands.Cog):
             
             self.dump_data()
 
-    @tasks.loop(seconds=10)
+    @tasks.loop(seconds=60)
     async def check_jail_timers(self):
         """
         Periodically checks if users should be released from jail.
         Also checks for users who have the role but are not in the DB (desync).
         """
-        self.logger.info("Checking jail timers and clerical errors...")
+        # self.logger.info("Checking jail timers and clerical errors...")
         current_time_ms = int(time.time() * 1000)
 
         # Iterate over known guilds to clean up DB entries
@@ -539,9 +539,9 @@ class JailCog(commands.Cog):
                 continue
 
             # Check all members with the jail role
-            self.logger.info(f"Checking jail ({config.jailed_role_id}) status for {len(role.members)} members in guild {guild.id}.")
+            # self.logger.info(f"Checking jail ({config.jailed_role_id}) status for {len(role.members)} members in guild {guild.id}.")
             for member in role.members:
-                self.logger.info(f"Checking jail status for user {member.id} in guild {guild.id}.")
+                # self.logger.info(f"Checking jail status for user {member.id} in guild {guild.id}.")
                 # If they have the role, but `get_is_jailed` returns False, they are desynced
                 if not self.get_is_jailed(guild.id, member.id):
                     self.logger.info(f"User {member.id} found with jail role but no DB entry in {guild.id}.")
