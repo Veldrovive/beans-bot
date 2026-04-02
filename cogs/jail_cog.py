@@ -513,9 +513,15 @@ class JailCog(commands.Cog):
                     # Send Release Message
                     if config.release_scripts:
                         script = random.choice(config.release_scripts)
-                        channel = guild.get_channel(self.currently_jailed_data[guild_id][user_id].channel_id)
-                        if channel:
-                            await channel.send(script.format(jailed_user=member.mention))
+                        # channel = guild.get_channel(self.currently_jailed_data[guild_id][user_id].channel_id)
+                        # if channel:
+                        #     await channel.send(script.format(jailed_user=member.mention))
+                        # Instead, say this in the bot channel
+                        server_config = self.bot.config_manager.get_server_config(guild.id)
+                        announce_channel = guild.get_channel(server_config["bot_channel_id"])
+                        if announce_channel:
+                            await announce_channel.send(script.format(jailed_user=member.mention))
+                        
 
                 # Update Data
                 await self.data_set_user_free(guild_id, user_id)
