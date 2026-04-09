@@ -61,9 +61,9 @@ class Bot(commands.Bot):
 
     async def setup_hook(self):
         await self.add_cog(BasicCog(self))
-        # await self.add_cog(RoleNameCog(self))
-        # await self.add_cog(ClassifierCog(self))
-        # await self.add_cog(JailCog(self))
+        await self.add_cog(RoleNameCog(self))
+        await self.add_cog(ClassifierCog(self))
+        await self.add_cog(JailCog(self))
         await self.add_cog(BirthdayCog(self))
         # await self.add_cog(CouncilOfTedsCog(self))
 

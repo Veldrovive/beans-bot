@@ -7,6 +7,7 @@ import discord
 from discord.ext import tasks
 import dateparser
 import datetime
+import zoneinfo
 import random
 from peewee import *
 
@@ -16,7 +17,8 @@ if TYPE_CHECKING:
     from main import Bot
     from config import ConfigManager
 
-scheduled_time = datetime.time(hour=10)
+tz = zoneinfo.ZoneInfo("America/Detroit")
+scheduled_time = datetime.time(hour=10, tzinfo=tz)
 
 @dataclass
 class Birthday:
@@ -348,7 +350,7 @@ class BirthdayCog(commands.Cog):
         self.logger.debug(f"Found {len(birthdays)} birthdays. {birthdays}")
 
         # Get the current day, month, year to compare to our birthdays list
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(tz)
         today = now.day
         this_year = now.year
         this_month = now.month
