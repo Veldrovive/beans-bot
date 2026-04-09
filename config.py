@@ -5,10 +5,12 @@ from typing import Dict, Any, Optional
 import yaml
 from typing import List
 from contextlib import contextmanager
+from tinydb import TinyDB
+from peewee import SqliteDatabase
 
 class ConfigManager:
-    def __init__(self, config_file: Path = 'config.yaml'):
-        self.config_file = config_file
+    def __init__(self, config_file: Path | str = 'config.yaml'):
+        self.config_file = Path(config_file)
         # Check we have a json or yaml config file
         if self.config_file.suffix == ".json":
             self.config = self.load_json_config()
@@ -31,6 +33,16 @@ class ConfigManager:
         file_path = cog_path / filename
         with open(file_path, mode) as f:
             yield f
+
+    def open_tinydb_store(self, server_id: int, cog_id: str, filename: str):
+        cog_path = self.get_data_store_path(server_id, cog_id)
+        cog_path.mkdir(parents=True, exist_ok=True)
+        file_path = cog_path / filename
+        return TinyDB(file_path)
+
+    def open_peewee_store(self, filename: str):
+        file_path = self.data_store_path / filename
+        return SqliteDatabase(file_path)
 
     def load_json_config(self) -> Dict[str, Any]:
         if not os.path.exists(self.config_file):
@@ -94,3 +106,10 @@ class ConfigManager:
         server_config = self.get_server_config(guild_id)
         if server_config:
             return server_config.get("jail_confs")
+
+    def get_birthday_config(self, guild_id: int) -> Optional[Dict[str, Any]]:
+        server_config = self.get_server_config(guild_id)
+        if server_config:
+            return server_config.get("birthday_confs")
+        return None
+        

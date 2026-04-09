@@ -9,11 +9,13 @@ from pathlib import Path
 import logging
 import json
 
+from gemini_harness import GeminiHarness
 from db import DB
 from cogs.basic_cog import BasicCog
 from cogs.robotics_identity import RoleNameCog
 from cogs.classifier_cog import ClassifierCog
 from cogs.jail_cog import JailCog
+from cogs.birthday_cog import BirthdayCog
 # from cogs.council_of_teds_cog import CouncilOfTedsCog
 
 from config import ConfigManager
@@ -52,19 +54,23 @@ class Bot(commands.Bot):
         logging.info(f"****************\nConfig: {json.dumps(self.config_manager.config, indent=2)}\n****************")
 
         self.db = DB(DB_FILE)
+        self.gemini_harness = GeminiHarness()
 
         if self.db.get_state("message_count") is None:
             self.db.set_state("message_count", 0)
+
+    async def setup_hook(self):
+        await self.add_cog(BasicCog(self))
+        # await self.add_cog(RoleNameCog(self))
+        # await self.add_cog(ClassifierCog(self))
+        # await self.add_cog(JailCog(self))
+        await self.add_cog(BirthdayCog(self))
+        # await self.add_cog(CouncilOfTedsCog(self))
 
     async def on_ready(self):
         """Called when the bot is connected and ready."""
         logging.info(f'Logged in as {self.user} (ID: {self.user.id})')
         logging.info('------')
-        await self.add_cog(BasicCog(self))
-        await self.add_cog(RoleNameCog(self))
-        await self.add_cog(ClassifierCog(self))
-        await self.add_cog(JailCog(self))
-        # await self.add_cog(CouncilOfTedsCog(self))
 
 
 # --- Main Execution ---

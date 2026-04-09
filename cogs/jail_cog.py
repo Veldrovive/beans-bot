@@ -67,7 +67,7 @@ class JailCog(commands.Cog):
         self.check_jail_timers.start()
         self.logger.info("JailCog initialized")
 
-    def cog_unload(self):
+    async def cog_unload(self):
         self.check_jail_timers.cancel()
 
     def get_config(self, guild_id: int) -> Optional[JailCogConfig]:

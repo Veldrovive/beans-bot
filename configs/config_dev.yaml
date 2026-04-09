@@ -115,6 +115,9 @@ servers:
         - "What are you doing in the stocks {jailed_user}? You're free to go."
       forgotten_prisoner_scripts:
         - "You're not on the lists {jailed_user}. Well you must be here for a reason. Back in the stocks!"
-      
-      
-      
+    birthday_confs:
+      birthdays_message_channel_id: 1491581488238690418
+      birthdays_message_id: 1491581499818905742
+
+      enable_holidays: true
+      enable_on_this_day: true
