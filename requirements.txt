@@ -21,3 +21,5 @@ tinydb==4.8.2
 peewee==4.0.4
 dateparser==1.4.0
 google-genai==1.71.0
+beautifulsoup4==4.14.3
+httpx==0.28.1
