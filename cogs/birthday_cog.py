@@ -341,6 +341,7 @@ class BirthdayCog(commands.Cog):
 
         try:
             birthdays = await self.read_birthdays(guild_id)
+            self.logger.info(f"Found {len(birthdays)} birthdays. {birthdays}")
         except ValueError:
             self.logger.warning(f"Failed to read birthdays for guild {guild_id}")
             return
@@ -352,8 +353,11 @@ class BirthdayCog(commands.Cog):
         this_year = now.year
         this_month = now.month
 
+        self.logger.info(f"Looking for birthdays with day {today} and month {this_month}")
+
         # Check if there are any birthdays today
         birthdays_today = [b for b in birthdays if b.day == today and b.month == this_month]
+        self.logger.info(f"Found {len(birthdays_today)} birthdays today. {birthdays_today}")
         non_messaged_birthdays = []
         for birthday in birthdays_today:
             self.logger.info(f"{birthday.user_name} has a birthday today. Checking if message already sent")
