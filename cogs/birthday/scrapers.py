@@ -311,4 +311,66 @@ if __name__ == "__main__":
             print(f"\nBest On This Day: {chosen_on_this_day}")
             print(f"Reason: {reason}")
 
-    asyncio.run(test())
+    async def test_find_action_holidays():
+        import re
+        import datetime
+        import asyncio
+        
+        # We look for actionable, creative holidays following the "Verb a [Noun] Day" pattern
+        verbs = [
+            "draw", "create", "make", "paint", "write", "build", "design", "invent",
+            "craft", "color", "tell", "do", "start", "hug", "kiss", "thank", "plant",
+            "adopt", "take", "bake", "cook", "read", "sing", "pet", "visit", "learn",
+            "earn", "buy", "send", "call", "watch", "play", "give", "find", "catch",
+            "wear", "eat", "drink", "walk", "clean", "wash"
+        ]
+        
+        # Matches "Draw a", "Write an", etc.
+        verb_group = "|".join(verbs)
+        pattern = re.compile(rf'\b({verb_group})\s+an?\s+', re.IGNORECASE)
+        
+        year = datetime.datetime.now().year
+        start_date = datetime.date(year, 1, 1)
+        end_date = datetime.date(year, 12, 31)
+        
+        dates_to_check = []
+        current_date = start_date
+        while current_date <= end_date:
+            dates_to_check.append((current_date.day, current_date.month, current_date.year))
+            current_date += datetime.timedelta(days=1)
+            
+        print(f"Searching for action holidays across {year}...")
+        semaphore = asyncio.Semaphore(5) # Conservative concurrency to avoid rate-limiting
+        
+        async def fetch_and_check(day, month, year):
+            async with semaphore:
+                try:
+                    holidays = await get_holidays(day, month, year)
+                    matches = []
+                    for h in holidays:
+                        if pattern.search(h.name):
+                            matches.append(h)
+                    
+                    if matches:
+                        print(f"[{month}/{day}/{year}] Matches found:")
+                        for m in matches:
+                            print(f"  - {m.name} ({m.link})")
+                    return matches
+                except Exception as e:
+                    print(f"Error on {month}/{day}/{year}: {e}")
+                    return []
+                finally:
+                    await asyncio.sleep(0.5) # Polite delay
+                    
+        # Concurrently fetch and check all days in the year
+        tasks = [fetch_and_check(d, m, y) for d, m, y in dates_to_check]
+        results = await asyncio.gather(*tasks)
+        
+        all_matches = [h for day_matches in results for h in day_matches]
+        print(f"\nFinished! Found {len(all_matches)} action holidays in {year}.")
+
+    # Run the standard test:
+    asyncio.run(test_find_action_holidays())
+
+    # Uncomment to run the full year scan for action holidays:
+    # asyncio.run(test_find_action_holidays())
