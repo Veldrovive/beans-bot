@@ -16,21 +16,65 @@ If we cannot figure out who the quote is of, connor gets sent to jail.
 import discord
 from discord.ext import commands, tasks
 import logging
-from dataclasses import dataclass, asdict
-from dataclass_wizard import JSONWizard
+from dataclasses import dataclass
 from typing import Optional
 import time
-import json
 import random
+from peewee import *
 
-@dataclass
-class JailData(JSONWizard):
-    user_id: int
-    channel_id: int
-    offending_message_id: int
-    start_time: int  # ms since epoch
-    end_time: int  # ms since epoch
-    has_been_humiliated: bool = False  # Whether the user has chatted and been told by the bot that they are in jail
+db_proxy = Proxy()
+
+class JailedUser(Model):
+    server_id = IntegerField()
+    user_id = IntegerField()
+    channel_id = IntegerField()
+    offending_message_id = IntegerField()
+    start_time = IntegerField()
+    end_time = IntegerField()
+    has_been_humiliated = BooleanField(default=False)
+
+    class Meta:
+        database = db_proxy
+
+class HistoricalJailedUser(Model):
+    server_id = IntegerField()
+    user_id = IntegerField()
+    channel_id = IntegerField()
+    offending_message_id = IntegerField()
+    start_time = IntegerField()
+    end_time = IntegerField()
+    has_been_humiliated = BooleanField(default=False)
+
+    class Meta:
+        database = db_proxy
+
+class TomatoCounter(Model):
+    server_id = IntegerField()
+    user_id = IntegerField()
+    count = IntegerField(default=0)
+
+    class Meta:
+        database = db_proxy
+        primary_key = CompositeKey('server_id', 'user_id')
+
+class TomatoHistory(Model):
+    server_id = IntegerField()
+    thrower_user_id = IntegerField()
+    attacked_user_id = IntegerField()
+    message_id = IntegerField()
+    timestamp = IntegerField()
+    is_innocent = BooleanField()
+
+    class Meta:
+        database = db_proxy
+
+class UsedMessage(Model):
+    server_id = IntegerField()
+    message_id = IntegerField()
+
+    class Meta:
+        database = db_proxy
+
 
 @dataclass
 class JailCogConfig:
@@ -53,15 +97,10 @@ class JailCog(commands.Cog):
         self.bot = bot
         self.logger = logging.getLogger(self.cog_id)
 
-        self.currently_jailed_user_ids: dict[int, list[int]] = {}  # guild_id -> list of user_ids
-        self.currently_jailed_data: dict[int, dict[int, JailData]] = {}  # guild_id -> user_id -> JailData
-        self.historical_jailed_data: dict[int, list[JailData]] = {}  # guild_id -> list of JailData
-        self.tomato_counters: dict[int, dict[int, int]] = {}  # guild_id -> user_id -> tomato_count
-        self.tomato_history: dict[int, list[tuple[int, int, int, int, bool]]] = {}  # guild_id -> list of (thrower_user_id, attacked_user_id, message_id, timestamp, is_innocent)
-
-        self.used_messages: dict[int, set[int]] = {}  # guild_id -> set of message_ids that have already been used to jail someone.
-
-        self.load_data()
+        self.db = self.bot.config_manager.open_peewee_store("jail_cog.db")
+        db_proxy.initialize(self.db)
+        self.db.connect()
+        self.db.create_tables([JailedUser, HistoricalJailedUser, TomatoCounter, TomatoHistory, UsedMessage])
 
         # Start the background task to check for jail releases
         self.check_jail_timers.start()
@@ -90,22 +129,25 @@ class JailCog(commands.Cog):
         if config is None:
             return False
 
-        if user_id not in self.currently_jailed_user_ids.get(guild_id, []):
+        try:
+            jailed_user = JailedUser.get((JailedUser.server_id == guild_id) & (JailedUser.user_id == user_id))
+        except JailedUser.DoesNotExist:
             self.logger.warning(f"User {user_id} is not jailed in guild {guild_id}")
             return False
 
         # Move data to historical
-        jail_data = self.currently_jailed_data[guild_id][user_id]
-        if guild_id not in self.historical_jailed_data:
-            self.historical_jailed_data[guild_id] = []
-        
-        self.historical_jailed_data[guild_id].append(jail_data)
+        HistoricalJailedUser.create(
+            server_id=guild_id,
+            user_id=jailed_user.user_id,
+            channel_id=jailed_user.channel_id,
+            offending_message_id=jailed_user.offending_message_id,
+            start_time=jailed_user.start_time,
+            end_time=jailed_user.end_time,
+            has_been_humiliated=jailed_user.has_been_humiliated
+        )
         
         # Remove from current
-        del self.currently_jailed_data[guild_id][user_id]
-        self.currently_jailed_user_ids[guild_id].remove(user_id)
-
-        self.dump_data()
+        jailed_user.delete_instance()
         return True
 
     def data_set_user_jailed(self, guild_id: int, user_id: int, channel_id: int, offending_message_id: int) -> bool:
@@ -116,18 +158,11 @@ class JailCog(commands.Cog):
         if config is None:
             return False
 
-        if guild_id not in self.currently_jailed_user_ids:
-            self.currently_jailed_user_ids[guild_id] = []
-        if guild_id not in self.currently_jailed_data:
-            self.currently_jailed_data[guild_id] = {}
-        if guild_id not in self.used_messages:
-            self.used_messages[guild_id] = set()
-
-        if user_id in self.currently_jailed_user_ids[guild_id]:
+        if JailedUser.select().where((JailedUser.server_id == guild_id) & (JailedUser.user_id == user_id)).exists():
             return False
 
-        self.currently_jailed_user_ids[guild_id].append(user_id)
-        self.currently_jailed_data[guild_id][user_id] = JailData(
+        JailedUser.create(
+            server_id=guild_id,
             user_id=user_id,
             channel_id=channel_id,
             offending_message_id=offending_message_id,
@@ -135,126 +170,14 @@ class JailCog(commands.Cog):
             end_time=int(time.time() * 1000) + config.jail_length_ms,
             has_been_humiliated=False
         )
-        self.used_messages[guild_id].add(offending_message_id)
+        
+        if not UsedMessage.select().where((UsedMessage.server_id == guild_id) & (UsedMessage.message_id == offending_message_id)).exists():
+            UsedMessage.create(server_id=guild_id, message_id=offending_message_id)
 
-        self.dump_data()
         return True
 
-    def dump_data(self):
-        """
-        Saves all data to disk. Converts JailData objects to dicts for JSON serialization.
-        """
-        for guild_id in self.currently_jailed_user_ids:
-            # Safely get data or default to empty
-            jailed_user_ids = self.currently_jailed_user_ids.get(guild_id, [])
-            
-            # Convert JailData objects to dicts
-            jailed_data_raw = self.currently_jailed_data.get(guild_id, {})
-            jailed_data_json = {str(uid): data.to_dict() for uid, data in jailed_data_raw.items()}
-            
-            # Convert Historical JailData objects to dicts
-            historical_raw = self.historical_jailed_data.get(guild_id, [])
-            historical_json = [data.to_dict() for data in historical_raw]
-            
-            used_messages = list(self.used_messages.get(guild_id, set()))
-            tomato_counters = self.tomato_counters.get(guild_id, {})
-            tomato_history = self.tomato_history.get(guild_id, [])
-
-            # Helper to write
-            def write_json(filename, data):
-                self.logger.info(f"Writing {filename} for guild {guild_id}")
-                with self.bot.config_manager.open_data_store(guild_id, self.cog_id, filename, "w") as f:
-                    json.dump(data, f, indent=4)
-
-            try:
-                write_json("currently_jailed_user_ids.json", jailed_user_ids)
-                write_json("currently_jailed_data.json", jailed_data_json)
-                write_json("historical_jailed_data.json", historical_json)
-                write_json("used_messages.json", used_messages)
-                write_json("tomato_counters.json", tomato_counters)
-                write_json("tomato_history.json", tomato_history)
-            except Exception as e:
-                self.logger.error(f"Failed to dump data for guild {guild_id}: {e}")
-
-    def load_data(self):
-        """
-        Loads all data from disk.
-        """
-        for guild in self.bot.guilds:
-            guild_id = guild.id
-            self._init_guild_storage(guild_id)
-
-            data_store_path = self.bot.config_manager.get_data_store_path(guild_id, self.cog_id)
-            if not data_store_path.exists():
-                continue
-
-            try:
-                # Load User IDs
-                self.logger.info(f"Loading currently_jailed_user_ids.json for guild {guild_id}")
-                with self.bot.config_manager.open_data_store(guild_id, self.cog_id, "currently_jailed_user_ids.json", "r") as f:
-                    self.currently_jailed_user_ids[guild_id] = json.load(f)
-                self.logger.info(f"Loaded {len(self.currently_jailed_user_ids[guild_id])} currently jailed users for guild {guild_id}")
-
-                # Load Jailed Data (Convert dict back to JailData)
-                self.logger.info(f"Loading currently_jailed_data.json for guild {guild_id}")
-                with self.bot.config_manager.open_data_store(guild_id, self.cog_id, "currently_jailed_data.json", "r") as f:
-                    raw_data = json.load(f)
-                    self.currently_jailed_data[guild_id] = {
-                        int(uid): JailData.from_dict(d) for uid, d in raw_data.items()
-                    }
-                self.logger.info(f"Loaded {len(self.currently_jailed_data[guild_id])} currently jailed data for guild {guild_id}")
-
-                # Load Historical Data
-                self.logger.info(f"Loading historical_jailed_data.json for guild {guild_id}")
-                with self.bot.config_manager.open_data_store(guild_id, self.cog_id, "historical_jailed_data.json", "r") as f:
-                    raw_hist = json.load(f)
-                    self.historical_jailed_data[guild_id] = [JailData.from_dict(d) for d in raw_hist]
-                self.logger.info(f"Loaded {len(self.historical_jailed_data[guild_id])} historical jailed data for guild {guild_id}")
-
-                # Load Used Messages
-                self.logger.info(f"Loading used_messages.json for guild {guild_id}")
-                with self.bot.config_manager.open_data_store(guild_id, self.cog_id, "used_messages.json", "r") as f:
-                    self.used_messages[guild_id] = set(json.load(f))
-                self.logger.info(f"Loaded {len(self.used_messages[guild_id])} used messages for guild {guild_id}")
-
-                # Load Tomato Counters
-                self.logger.info(f"Loading tomato_counters.json for guild {guild_id}")
-                with self.bot.config_manager.open_data_store(guild_id, self.cog_id, "tomato_counters.json", "r") as f:
-                    # JSON keys are strings, convert back to int
-                    raw_tomato = json.load(f)
-                    self.tomato_counters[guild_id] = {int(uid): count for uid, count in raw_tomato.items()}
-                self.logger.info(f"Loaded {len(self.tomato_counters[guild_id])} tomato counters for guild {guild_id}")
-
-                # Load Tomato History
-                self.logger.info(f"Loading tomato_history.json for guild {guild_id}")
-                with self.bot.config_manager.open_data_store(guild_id, self.cog_id, "tomato_history.json", "r") as f:
-                    raw_history = json.load(f)
-                    self.tomato_history[guild_id] = [
-                        (thrower, attacked, msg_id, ts, bool(innocent)) 
-                        for thrower, attacked, msg_id, ts, innocent in raw_history
-                    ]
-                self.logger.info(f"Loaded {len(self.tomato_history[guild_id])} tomato history for guild {guild_id}")
-            except FileNotFoundError:
-                self.logger.warning(f"Some data files missing for guild {guild_id}, starting with partial defaults.")
-            except Exception as e:
-                self.logger.error(f"Error loading data for guild {guild_id}: {e}")
-
-    def _init_guild_storage(self, guild_id: int):
-        if guild_id not in self.currently_jailed_user_ids:
-            self.currently_jailed_user_ids[guild_id] = []
-        if guild_id not in self.currently_jailed_data:
-            self.currently_jailed_data[guild_id] = {}
-        if guild_id not in self.historical_jailed_data:
-            self.historical_jailed_data[guild_id] = []
-        if guild_id not in self.used_messages:
-            self.used_messages[guild_id] = set()
-        if guild_id not in self.tomato_counters:
-            self.tomato_counters[guild_id] = {}
-        if guild_id not in self.tomato_history:
-            self.tomato_history[guild_id] = []
-
     def get_is_jailed(self, guild_id: int, user_id: int) -> bool:
-        return user_id in self.currently_jailed_user_ids.get(guild_id, [])
+        return JailedUser.select().where((JailedUser.server_id == guild_id) & (JailedUser.user_id == user_id)).exists()
 
     async def try_jail_user(self, guild_id: int, user_id: int, offending_message: discord.Message) -> bool:
         """
@@ -265,7 +188,7 @@ class JailCog(commands.Cog):
             return False
 
         # 1. Check if message already used
-        if offending_message.id in self.used_messages.get(guild_id, set()):
+        if UsedMessage.select().where((UsedMessage.server_id == guild_id) & (UsedMessage.message_id == offending_message.id)).exists():
             return False
 
         # 2. Check if user already jailed
@@ -366,30 +289,28 @@ class JailCog(commands.Cog):
 
         is_jailed = self.get_is_jailed(payload.guild_id, target_user_id)
 
-        if payload.guild_id not in self.tomato_history:
-            self.tomato_history[payload.guild_id] = []
+        TomatoHistory.create(
+            server_id=payload.guild_id,
+            thrower_user_id=reacting_user_id,
+            attacked_user_id=target_user_id,
+            message_id=payload.message_id,
+            timestamp=int(time.time() * 1000),
+            is_innocent=not is_jailed
+        )
 
-        self.tomato_history[payload.guild_id].append((
-            reacting_user_id,
-            target_user_id,
-            payload.message_id,
-            int(time.time() * 1000),
-            not is_jailed  # is_innocent
-        ))
-
-        # 1. If target is in jail -> Increment counter
-        if is_jailed:
-            self.logger.info(f"Tomato thrown at jailed user {target_user_id} in guild {payload.guild_id}")
-            if payload.guild_id not in self.tomato_counters:
-                self.tomato_counters[payload.guild_id] = {}
+        # 1. Increment counter
+        self.logger.info(f"Tomato thrown at user {target_user_id} in guild {payload.guild_id}")
+        counter, created = TomatoCounter.get_or_create(
+            server_id=payload.guild_id, 
+            user_id=target_user_id, 
+            defaults={'count': 0}
+        )
+        counter.count += 1
+        counter.save()
             
-            current_count = self.tomato_counters[payload.guild_id].get(target_user_id, 0)
-            self.tomato_counters[payload.guild_id][target_user_id] = current_count + 1
-            self.dump_data()
         # 2. If target is NOT in jail -> Warn the thrower
-        else:
+        if not is_jailed:
             self.logger.info(f"Tomato thrown at innocent user {target_user_id} in guild {payload.guild_id}")
-            self.dump_data()
             if config.assult_innocent_scripts:
                 script = random.choice(config.assult_innocent_scripts)
                 # Format arguments: reacting user and attacked user
@@ -428,7 +349,6 @@ class JailCog(commands.Cog):
             return
         
         if not self.get_is_jailed(message.guild.id, message.author.id):
-            self.logger.info(f"User {message.author.id} is not in jail. Not throwing tomato.")
             return
 
         config = self.get_config(message.guild.id)
@@ -445,11 +365,15 @@ class JailCog(commands.Cog):
             pass # Fail silently if permissions issue or emoji invalid
 
         # Check humilitation
-        jail_data = self.currently_jailed_data[message.guild.id][message.author.id]
-        
+        try:
+            jail_data = JailedUser.get((JailedUser.server_id == message.guild.id) & (JailedUser.user_id == message.author.id))
+        except JailedUser.DoesNotExist:
+            return
+
         if not jail_data.has_been_humiliated:
             self.logger.info(f"User {message.author.id} is in jail and has not been humiliated. Humiliating...")
             jail_data.has_been_humiliated = True
+            jail_data.save()
             
             # Send humiliation message
             if config.humiliate_scripts:
@@ -461,8 +385,7 @@ class JailCog(commands.Cog):
                     # Fallback if reply fails
                     self.logger.info(f"Failed to reply to message {message.id} in guild {message.guild.id}. Not humiliating.")
                     await message.channel.send(script.format(jailed_user=message.author.mention))
-            
-            self.dump_data()
+
 
     @tasks.loop(seconds=60)
     async def check_jail_timers(self):
@@ -470,11 +393,10 @@ class JailCog(commands.Cog):
         Periodically checks if users should be released from jail.
         Also checks for users who have the role but are not in the DB (desync).
         """
-        # self.logger.info("Checking jail timers and clerical errors...")
         current_time_ms = int(time.time() * 1000)
 
         # Iterate over known guilds to clean up DB entries
-        guild_ids_in_db = list(self.currently_jailed_data.keys())
+        guild_ids_in_db = [g.server_id for g in JailedUser.select(JailedUser.server_id).distinct()]
 
         # 1. Standard Release Logic (Existing DB entries)
         for guild_id in guild_ids_in_db:
@@ -488,9 +410,9 @@ class JailCog(commands.Cog):
 
             # Identify users to release based on time
             users_to_release = []
-            for user_id, data in self.currently_jailed_data[guild_id].items():
-                if current_time_ms >= data.end_time:
-                    users_to_release.append(user_id)
+            for jailed_user in JailedUser.select().where(JailedUser.server_id == guild_id):
+                if current_time_ms >= jailed_user.end_time:
+                    users_to_release.append(jailed_user.user_id)
 
             # Release them
             for user_id in users_to_release:
@@ -513,15 +435,10 @@ class JailCog(commands.Cog):
                     # Send Release Message
                     if config.release_scripts:
                         script = random.choice(config.release_scripts)
-                        # channel = guild.get_channel(self.currently_jailed_data[guild_id][user_id].channel_id)
-                        # if channel:
-                        #     await channel.send(script.format(jailed_user=member.mention))
-                        # Instead, say this in the bot channel
                         server_config = self.bot.config_manager.get_server_config(guild.id)
                         announce_channel = guild.get_channel(server_config["bot_channel_id"])
                         if announce_channel:
                             await announce_channel.send(script.format(jailed_user=member.mention))
-                        
 
                 # Update Data
                 await self.data_set_user_free(guild_id, user_id)
@@ -539,15 +456,15 @@ class JailCog(commands.Cog):
 
             # We need a channel to announce clerical errors in.
             server_config = self.bot.config_manager.get_server_config(guild.id)
+            if not server_config or "bot_channel_id" not in server_config:
+                continue
+            
             announce_channel = guild.get_channel(server_config["bot_channel_id"])
             if not announce_channel:
-                self.logger.warning(f"Could not find bot channel for guild {guild.id}. Not checking for clerical errors.")
                 continue
 
             # Check all members with the jail role
-            # self.logger.info(f"Checking jail ({config.jailed_role_id}) status for {len(role.members)} members in guild {guild.id}.")
             for member in role.members:
-                # self.logger.info(f"Checking jail status for user {member.id} in guild {guild.id}.")
                 # If they have the role, but `get_is_jailed` returns False, they are desynced
                 if not self.get_is_jailed(guild.id, member.id):
                     self.logger.info(f"User {member.id} found with jail role but no DB entry in {guild.id}.")
@@ -578,3 +495,64 @@ class JailCog(commands.Cog):
     @check_jail_timers.before_loop
     async def before_check_jail_timers(self):
         await self.bot.wait_until_ready()
+
+    @commands.group(name="jail", invoke_without_command=True)
+    @commands.guild_only()
+    async def jail_group(self, ctx: commands.Context):
+        """Commands to see jail stats."""
+        config_manager = getattr(self.bot, "config_manager", None)
+        if not config_manager or not ctx.guild:
+            return
+        bot_channel_id = config_manager.get_bot_channel_id(ctx.guild.id)
+        if bot_channel_id and ctx.channel.id != bot_channel_id:
+            return
+        await ctx.send_help(ctx.command)
+
+    @jail_group.command(name="current", help="Shows who is currently in jail.")
+    @commands.guild_only()
+    async def jail_current(self, ctx: commands.Context):
+        config_manager = getattr(self.bot, "config_manager", None)
+        if not config_manager or not ctx.guild:
+            return
+        bot_channel_id = config_manager.get_bot_channel_id(ctx.guild.id)
+        if bot_channel_id and ctx.channel.id != bot_channel_id:
+            return
+
+        jailed_users = list(JailedUser.select().where(JailedUser.server_id == ctx.guild.id))
+        if not jailed_users:
+            await ctx.send("No one is currently in jail!")
+            return
+
+        mentions = [f"<@{user.user_id}>" for user in jailed_users]
+        await ctx.send(f"Currently in jail: {', '.join(mentions)}")
+
+    @jail_group.command(name="info", help="Shows stats about a specific person's jail time.")
+    @commands.guild_only()
+    async def jail_info(self, ctx: commands.Context, *, member_query: str):
+        config_manager = getattr(self.bot, "config_manager", None)
+        if not config_manager or not ctx.guild:
+            return
+        bot_channel_id = config_manager.get_bot_channel_id(ctx.guild.id)
+        if bot_channel_id and ctx.channel.id != bot_channel_id:
+            return
+
+        try:
+            member = await commands.MemberConverter().convert(ctx, member_query)
+        except commands.MemberNotFound:
+            await ctx.send(f"Could not find anyone named '{member_query}'.")
+            return
+
+
+        current_jail = JailedUser.select().where((JailedUser.server_id == ctx.guild.id) & (JailedUser.user_id == member.id)).count()
+        historical_jail = HistoricalJailedUser.select().where((HistoricalJailedUser.server_id == ctx.guild.id) & (HistoricalJailedUser.user_id == member.id)).count()
+        total_jail_time = current_jail + historical_jail
+
+        tomato_counter = TomatoCounter.get_or_none((TomatoCounter.server_id == ctx.guild.id) & (TomatoCounter.user_id == member.id))
+        tomatoes_thrown = tomato_counter.count if tomato_counter else 0
+
+        message = f"**Jail Stats for {member.display_name}**\n"
+        message += f"- Times in jail: {total_jail_time}\n"
+        message += f"- Tomatoes thrown at them: {tomatoes_thrown}"
+
+        await ctx.send(message)
+
