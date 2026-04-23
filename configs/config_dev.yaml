@@ -99,10 +99,13 @@ servers:
       jail_emoji: "tojail"
       tomato_emoji: "🍅"
       to_jail_threshold: 1
+      mega_jail_threshold: 1
       jail_length_ms: 10000 #86400000  # 24 hours in milliseconds
       jailed_role_id: 1469116763257176247
       on_jailed_scripts:
         - "Hark! {jailed_user} has been sent to the stocks for heinous speech!"
+      mega_jail_scripts:
+        - "The people have spoken. {jailed_user}'s name is forfeit. The first reply to this message will be their new name."
       humiliate_scripts:
         - "Silence {jailed_user}! I throw a tomato at thee!"
       assult_innocent_scripts:

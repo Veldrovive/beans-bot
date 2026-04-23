@@ -21,6 +21,7 @@ from typing import Optional
 import time
 import random
 from peewee import *
+import re
 
 db_proxy = Proxy()
 
@@ -44,6 +45,16 @@ class HistoricalJailedUser(Model):
     start_time = IntegerField()
     end_time = IntegerField()
     has_been_humiliated = BooleanField(default=False)
+
+    class Meta:
+        database = db_proxy
+
+class PendingRename(Model):
+    server_id = IntegerField()
+    prompt_message_id = IntegerField()
+    target_user_id = IntegerField()
+    offending_message_id = IntegerField()
+    is_used = BooleanField(default=False)
 
     class Meta:
         database = db_proxy
@@ -81,9 +92,11 @@ class JailCogConfig:
     jail_emoji: str
     tomato_emoji: str
     to_jail_threshold: int
+    mega_jail_threshold: int
     jail_length_ms: int
     jailed_role_id: int
     on_jailed_scripts: list[str]  # May have the format string "{jailed_user}"
+    mega_jail_scripts: list[str]  # May have the format string "{jailed_user}"
     humiliate_scripts: list[str]  # May have the format string "{jailed_user}"
     assult_innocent_scripts: list[str]  # May have the format string "{reacting_user}" and "{attacked_user}"
     already_in_jail_scripts: list[str]  # May have the format string "{jailed_user}"
@@ -100,7 +113,7 @@ class JailCog(commands.Cog):
         self.db = self.bot.config_manager.open_peewee_store("jail_cog.db")
         db_proxy.initialize(self.db)
         self.db.connect()
-        self.db.create_tables([JailedUser, HistoricalJailedUser, TomatoCounter, TomatoHistory, UsedMessage])
+        self.db.create_tables([JailedUser, HistoricalJailedUser, TomatoCounter, TomatoHistory, UsedMessage, PendingRename])
 
         # Start the background task to check for jail releases
         self.check_jail_timers.start()
@@ -234,6 +247,40 @@ class JailCog(commands.Cog):
 
         return True
 
+    async def try_mega_jail_user(self, guild_id: int, user_id: int, offending_message: discord.Message) -> bool:
+        """
+        Called when a user hits the mega-jail threshold. Prompts the channel for a rename.
+        """
+        config = self.get_config(guild_id)
+        if config is None:
+            return False
+
+        # 1. Deduplication: Check if we already prompted a rename for this specific message
+        if PendingRename.select().where(
+            (PendingRename.server_id == guild_id) & 
+            (PendingRename.offending_message_id == offending_message.id)
+        ).exists():
+            return False
+
+        member = offending_message.author
+
+        # 2. Select and send the script
+        script = random.choice(config.mega_jail_scripts)
+
+        formatted_msg = script.format(jailed_user=member.mention)
+        prompt_message = await offending_message.channel.send(formatted_msg)
+
+        # 3. Save to database
+        PendingRename.create(
+            server_id=guild_id,
+            prompt_message_id=prompt_message.id,
+            target_user_id=user_id,
+            offending_message_id=offending_message.id,
+            is_used=False
+        )
+        
+        return True
+
     async def on_jail_reaction(self, payload: discord.RawReactionActionEvent):
         """
         Handles a :tojail: reaction being added.
@@ -260,6 +307,10 @@ class JailCog(commands.Cog):
                 break
 
         self.logger.info(f"Jail reaction count for message {message.id} in guild {payload.guild_id}: {jail_reaction_count}")
+
+        if jail_reaction_count >= config.mega_jail_threshold:
+            self.logger.info(f"Jail reaction count for message {message.id} in guild {payload.guild_id} is >= {config.mega_jail_threshold}. Mega jailing user {message.author.id}.")
+            await self.try_mega_jail_user(payload.guild_id, message.author.id, message)
 
         if jail_reaction_count >= config.to_jail_threshold:
             # Target the message author
@@ -343,8 +394,7 @@ class JailCog(commands.Cog):
             self.logger.info(f"Tomato emoji detected. Processing tomato reaction.")
             await self.on_tomato_reaction(payload)
 
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
+    async def handle_humiliation(self, message: discord.Message):
         if message.author.bot or not message.guild:
             return
         
@@ -386,6 +436,71 @@ class JailCog(commands.Cog):
                     self.logger.info(f"Failed to reply to message {message.id} in guild {message.guild.id}. Not humiliating.")
                     await message.channel.send(script.format(jailed_user=message.author.mention))
 
+    async def handle_name_change(self, message: discord.Message):
+        if message.reference and message.reference.message_id:
+            # Check if this message is replying to an active rename prompt
+            try:
+                pending_rename = PendingRename.get(
+                    (PendingRename.server_id == message.guild.id) & 
+                    (PendingRename.prompt_message_id == message.reference.message_id) &
+                    (PendingRename.is_used == False)
+                )
+                
+                # Mark as used immediately to prevent race conditions from multiple quick replies
+                pending_rename.is_used = True
+                pending_rename.save()
+
+                target_member = message.guild.get_member(pending_rename.target_user_id)
+                if not target_member:
+                    try:
+                        target_member = await message.guild.fetch_member(pending_rename.target_user_id)
+                    except discord.NotFound:
+                        pass
+                
+                if target_member:
+                    if target_member.id == message.guild.owner_id:
+                        prompt_msg = await message.channel.fetch_message(pending_rename.prompt_message_id)
+                        await prompt_msg.edit(content=f"~~{prompt_msg.content}~~ \n\nThe server owner is the supreme entity. I cannot harm them!")
+                        return
+
+                    # Parse the name to keep parentheticals
+                    # Matches base name in group 1, and optional "(...)" in group 2
+                    match = re.match(r"^(.*?)\s*(\(.*?\))?$", target_member.display_name)
+                    base_name = match.group(1) if match else target_member.display_name
+                    parenthetical = match.group(2) if match and match.group(2) else ""
+
+                    # Construct new name, ensuring it fits in Discord's 32-character limit
+                    new_base = message.clean_content.strip()
+                    if parenthetical:
+                        # Leave room for the space and the parenthetical
+                        max_base_len = 32 - len(parenthetical) - 1
+                        new_nickname = f"{new_base[:max_base_len]} {parenthetical}"
+                    else:
+                        new_nickname = new_base[:32]
+
+                    # Apply the nickname
+                    try:
+                        await target_member.edit(nick=new_nickname)
+                        success_text = f"**{message.author.display_name} has dubbed them: {new_nickname}!**"
+                    except discord.Forbidden as e:
+                        self.logger.error(f"Failed to rename user {target_member.id} in guild {message.guild.id}. Not renaming.")
+                        print(e)
+                        success_text = f"**{message.author.display_name} tried to dub them {new_nickname}, but I lack the power to rename this user!**"
+
+                    # Edit the original prompt message to show it's resolved
+                    try:
+                        prompt_msg = await message.channel.fetch_message(pending_rename.prompt_message_id)
+                        await prompt_msg.edit(content=f"~~{prompt_msg.content}~~ \n\n{success_text}")
+                    except (discord.NotFound, discord.Forbidden):
+                        pass
+
+            except PendingRename.DoesNotExist:
+                pass # Not a reply to an active prompt, move on
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        await self.handle_humiliation(message)
+        await self.handle_name_change(message)
 
     @tasks.loop(seconds=60)
     async def check_jail_timers(self):
