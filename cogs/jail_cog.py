@@ -26,24 +26,24 @@ import re
 db_proxy = Proxy()
 
 class JailedUser(Model):
-    server_id = IntegerField()
-    user_id = IntegerField()
-    channel_id = IntegerField()
-    offending_message_id = IntegerField()
-    start_time = IntegerField()
-    end_time = IntegerField()
+    server_id = BigIntegerField()
+    user_id = BigIntegerField()
+    channel_id = BigIntegerField()
+    offending_message_id = BigIntegerField()
+    start_time = BigIntegerField()
+    end_time = BigIntegerField()
     has_been_humiliated = BooleanField(default=False)
 
     class Meta:
         database = db_proxy
 
 class HistoricalJailedUser(Model):
-    server_id = IntegerField()
-    user_id = IntegerField()
-    channel_id = IntegerField()
-    offending_message_id = IntegerField()
-    start_time = IntegerField()
-    end_time = IntegerField()
+    server_id = BigIntegerField()
+    user_id = BigIntegerField()
+    channel_id = BigIntegerField()
+    offending_message_id = BigIntegerField()
+    start_time = BigIntegerField()
+    end_time = BigIntegerField()
     has_been_humiliated = BooleanField(default=False)
 
     class Meta:
@@ -60,8 +60,8 @@ class PendingRename(Model):
         database = db_proxy
 
 class TomatoCounter(Model):
-    server_id = IntegerField()
-    user_id = IntegerField()
+    server_id = BigIntegerField()
+    user_id = BigIntegerField()
     count = IntegerField(default=0)
 
     class Meta:
@@ -69,19 +69,19 @@ class TomatoCounter(Model):
         primary_key = CompositeKey('server_id', 'user_id')
 
 class TomatoHistory(Model):
-    server_id = IntegerField()
-    thrower_user_id = IntegerField()
-    attacked_user_id = IntegerField()
-    message_id = IntegerField()
-    timestamp = IntegerField()
+    server_id = BigIntegerField()
+    thrower_user_id = BigIntegerField()
+    attacked_user_id = BigIntegerField()
+    message_id = BigIntegerField()
+    timestamp = BigIntegerField()
     is_innocent = BooleanField()
 
     class Meta:
         database = db_proxy
 
 class UsedMessage(Model):
-    server_id = IntegerField()
-    message_id = IntegerField()
+    server_id = BigIntegerField()
+    message_id = BigIntegerField()
 
     class Meta:
         database = db_proxy

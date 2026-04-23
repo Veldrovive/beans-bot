@@ -42,6 +42,7 @@ class ConfigManager:
 
     def open_peewee_store(self, filename: str):
         file_path = self.data_store_path / filename
+        print(f"Opening peewee store at {file_path.absolute()}")
         return SqliteDatabase(file_path)
 
     def load_json_config(self) -> Dict[str, Any]:

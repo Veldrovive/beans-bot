@@ -38,8 +38,8 @@ def migrate(config_path: Path):
         def rename_file(old_name, str_ext=".migrated"):
             src = get_file(old_name)
             if src.exists():
-                dst = get_file(old_name + str_ext)
-                src.rename(dst)
+                # dst = get_file(old_name + str_ext)
+                # src.rename(dst)
                 logger.info(f"Renamed {src.name} to {dst.name}")
 
         # 1. Migrate currently_jailed_data.json
@@ -56,11 +56,11 @@ def migrate(config_path: Path):
                             JailedUser.create(
                                 server_id=server_id,
                                 user_id=user_id,
-                                channel_id=data.get("channel_id", 0),
-                                offending_message_id=data.get("offending_message_id", 0),
-                                start_time=data.get("start_time", 0),
-                                end_time=data.get("end_time", 0),
-                                has_been_humiliated=data.get("has_been_humiliated", False)
+                                channel_id=data["channelId"],
+                                offending_message_id=data["offendingMessageId"],
+                                start_time=data["startTime"],
+                                end_time=data["endTime"],
+                                has_been_humiliated=data["hasBeenHumiliated"]
                             )
                 logger.info(f"Migrated currently jailed users for server {server_id}")
                 rename_file("currently_jailed_data.json")
@@ -79,12 +79,12 @@ def migrate(config_path: Path):
                     for data in hist_data:
                         HistoricalJailedUser.create(
                             server_id=server_id,
-                            user_id=data.get("user_id", 0),
-                            channel_id=data.get("channel_id", 0),
-                            offending_message_id=data.get("offending_message_id", 0),
-                            start_time=data.get("start_time", 0),
-                            end_time=data.get("end_time", 0),
-                            has_been_humiliated=data.get("has_been_humiliated", False)
+                            user_id=data["userId"],
+                            channel_id=data["channelId"],
+                            offending_message_id=data["offendingMessageId"],
+                            start_time=data["startTime"],
+                            end_time=data["endTime"],
+                            has_been_humiliated=data["hasBeenHumiliated"]
                         )
                 logger.info(f"Migrated historical jailed users for server {server_id}")
                 rename_file("historical_jailed_data.json")
