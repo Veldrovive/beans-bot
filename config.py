@@ -19,8 +19,10 @@ class ConfigManager:
         else:
             raise ValueError("Config file must be a json or yaml file.")
         
-        assert "lazy_store_folder" in self.config, "Config file must contain lazy_store_folder."
-        self.data_store_path = Path(self.config.get("lazy_store_folder"))
+        lazy_store_folder_env = os.getenv('LAZY_STORE_FOLDER')
+        lazy_store_folder = lazy_store_folder_env if lazy_store_folder_env else self.config.get("lazy_store_folder")
+        assert lazy_store_folder, "Config file must contain lazy_store_folder or environment variable LAZY_STORE_FOLDER must be set."
+        self.data_store_path = Path(lazy_store_folder)
         self.data_store_path.mkdir(parents=True, exist_ok=True)
 
     def get_data_store_path(self, server_id: int, cog_id: str) -> Path:

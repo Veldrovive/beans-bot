@@ -1,6 +1,6 @@
 model_device: "cpu"
 torch_cpu_threads: 1
-lazy_store_folder: "./data_backup_1"
+lazy_store_folder: "./data"
 
 servers:
   1435668295410782290:
@@ -126,7 +126,6 @@ servers:
         low_fat_cow_threshold: 0.5
         low_fat_cow_emoji: "cow"
         medium_fat_cow_threshold: 1.0
-        # Want to be good in unicode
         medium_fat_cow_emoji: "🇬,🇴,🅾️,🇩"
         high_fat_cow_threshold: 1.5
         high_fat_cow_emoji: "🇭,🇴,🇼,❓"

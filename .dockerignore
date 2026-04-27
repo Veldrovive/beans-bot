@@ -13,3 +13,6 @@ dist/
 htmlcov/
 .pytest_cache/
 db.sqlite3
+data/
+data_backup_*/
+docker_db/
