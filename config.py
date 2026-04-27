@@ -113,4 +113,10 @@ class ConfigManager:
         if server_config:
             return server_config.get("birthday_confs")
         return None
+
+    def get_fat_cow_config(self, guild_id: int) -> Optional[Dict[str, Any]]:
+        server_config = self.get_server_config(guild_id)
+        if server_config:
+            return server_config.get("fat_cow_confs")
+        return None
         

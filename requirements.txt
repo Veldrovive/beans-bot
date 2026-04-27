@@ -23,3 +23,4 @@ dateparser==1.4.0
 google-genai==1.71.0
 beautifulsoup4==4.14.3
 httpx==0.28.1
+emoji==2.15.0

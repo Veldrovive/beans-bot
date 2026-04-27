@@ -17,6 +17,7 @@ from cogs.classifier_cog import ClassifierCog
 from cogs.jail_cog import JailCog
 from cogs.birthday_cog import BirthdayCog
 from cogs.action_holiday_cog import ActionHolidayCog
+from cogs.fatcow_cog import FatCowCog
 # from cogs.council_of_teds_cog import CouncilOfTedsCog
 
 from config import ConfigManager
@@ -67,6 +68,7 @@ class Bot(commands.Bot):
         await self.add_cog(JailCog(self))
         await self.add_cog(BirthdayCog(self))
         await self.add_cog(ActionHolidayCog(self))
+        await self.add_cog(FatCowCog(self))
         # await self.add_cog(CouncilOfTedsCog(self))
 
     async def on_ready(self):

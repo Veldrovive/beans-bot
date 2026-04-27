@@ -124,3 +124,14 @@ servers:
 
       enable_holidays: true
       enable_on_this_day: true
+    fat_cow_confs:
+      reactions:
+        no_fat_cow_emoji: "knife"
+        low_fat_cow_threshold: 0.5
+        low_fat_cow_emoji: "cow"
+        medium_fat_cow_threshold: 1.0
+        # Want to be good in unicode
+        medium_fat_cow_emoji: "🇬,🇴,🅾️,🇩"
+        high_fat_cow_threshold: 1.5
+        high_fat_cow_emoji: "🇭,🇴,🇼,❓"
+        very_high_fat_cow_emoji: "tojail"
