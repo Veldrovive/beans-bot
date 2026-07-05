@@ -86,6 +86,25 @@ class UsedMessage(Model):
     class Meta:
         database = db_proxy
 
+class BeanCoinCounter(Model):
+    server_id = BigIntegerField()
+    user_id = BigIntegerField()
+    count = IntegerField(default=0)
+
+    class Meta:
+        database = db_proxy
+        primary_key = CompositeKey('server_id', 'user_id')
+
+class BeanCoinHistory(Model):
+    server_id = BigIntegerField()
+    giver_user_id = BigIntegerField()
+    receiver_user_id = BigIntegerField()
+    message_id = BigIntegerField()
+    timestamp = BigIntegerField()
+
+    class Meta:
+        database = db_proxy
+
 
 @dataclass
 class JailCogConfig:
@@ -103,6 +122,11 @@ class JailCogConfig:
     release_scripts: list[str]  # May have the format string "{jailed_user}"
     scot_free_scripts: list[str]  # Format: "{jailed_user}" - User found with role but no data, set free
     forgotten_prisoner_scripts: list[str] # Format: "{jailed_user}" - User found with role but no data, re-jailed
+    bean_coin_emoji: str
+    bribe_cost: int
+    bribe_success_scripts: list[str] # Format: "{botname}" and "{jaileduser}"
+    bribe_failure_scripts: list[str] # Format: "{botname}" and "{jaileduser}"
+
 
 class JailCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -113,7 +137,7 @@ class JailCog(commands.Cog):
         self.db = self.bot.config_manager.open_peewee_store("jail_cog.db")
         db_proxy.initialize(self.db)
         self.db.connect()
-        self.db.create_tables([JailedUser, HistoricalJailedUser, TomatoCounter, TomatoHistory, UsedMessage, PendingRename])
+        self.db.create_tables([JailedUser, HistoricalJailedUser, TomatoCounter, TomatoHistory, UsedMessage, PendingRename, BeanCoinCounter, BeanCoinHistory])
 
         # Start the background task to check for jail releases
         self.check_jail_timers.start()
@@ -371,6 +395,55 @@ class JailCog(commands.Cog):
                 )
                 await channel.send(formatted_msg)
 
+    async def on_bean_coin_reaction(self, payload: discord.RawReactionActionEvent):
+        """
+        Handles a :BeanCoin: reaction being added.
+        """
+        config = self.get_config(payload.guild_id)
+        if not config:
+            return
+
+        channel = self.bot.get_channel(payload.channel_id)
+        if not channel:
+            return
+
+        try:
+            message = await channel.fetch_message(payload.message_id)
+        except discord.NotFound:
+            return
+
+        giver_id = payload.user_id
+        receiver_id = message.author.id
+
+        if giver_id == receiver_id:
+            return # Can't give yourself coins
+
+        # Deduplicate: check if this user already gave a coin for this message
+        if BeanCoinHistory.select().where(
+            (BeanCoinHistory.server_id == payload.guild_id) &
+            (BeanCoinHistory.giver_user_id == giver_id) &
+            (BeanCoinHistory.message_id == payload.message_id)
+        ).exists():
+            return
+
+        # Add coin
+        BeanCoinHistory.create(
+            server_id=payload.guild_id,
+            giver_user_id=giver_id,
+            receiver_user_id=receiver_id,
+            message_id=payload.message_id,
+            timestamp=int(time.time() * 1000)
+        )
+
+        counter, created = BeanCoinCounter.get_or_create(
+            server_id=payload.guild_id,
+            user_id=receiver_id,
+            defaults={'count': 0}
+        )
+        counter.count += 1
+        counter.save()
+        self.logger.info(f"Granted 1 BeanCoin to {receiver_id} from {giver_id} in guild {payload.guild_id}")
+
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
         if payload.user_id == self.bot.user.id:
@@ -385,7 +458,8 @@ class JailCog(commands.Cog):
         # config.jail_emoji might be the actual unicode char or the name string
         is_jail = (str(payload.emoji) == config.jail_emoji) or (emoji_name == config.jail_emoji)
         is_tomato = (str(payload.emoji) == config.tomato_emoji) or (emoji_name == config.tomato_emoji)
-        self.logger.info(f"Emoji: {payload.emoji}, Emoji name: {emoji_name}, Is jail: {is_jail}, Is tomato: {is_tomato}")
+        is_bean_coin = (str(payload.emoji) == config.bean_coin_emoji) or (emoji_name == config.bean_coin_emoji)
+        self.logger.info(f"Emoji: {payload.emoji}, Emoji name: {emoji_name}, Is jail: {is_jail}, Is tomato: {is_tomato}, Is bean coin: {is_bean_coin}")
 
         if is_jail:
             self.logger.info(f"Jail emoji detected. Processing jail reaction.")
@@ -393,6 +467,9 @@ class JailCog(commands.Cog):
         elif is_tomato:
             self.logger.info(f"Tomato emoji detected. Processing tomato reaction.")
             await self.on_tomato_reaction(payload)
+        elif is_bean_coin:
+            self.logger.info(f"BeanCoin emoji detected. Processing bean coin reaction.")
+            await self.on_bean_coin_reaction(payload)
 
     async def handle_humiliation(self, message: discord.Message):
         if message.author.bot or not message.guild:
@@ -623,6 +700,55 @@ class JailCog(commands.Cog):
             return
         await ctx.send_help(ctx.command)
 
+    @jail_group.command(name="bribe", help="Bribe the bot to let you out of jail.")
+    @commands.guild_only()
+    async def jail_bribe(self, ctx: commands.Context):
+        if not ctx.guild or not isinstance(ctx.author, discord.Member):
+            return
+            
+        config = self.get_config(ctx.guild.id)
+        if not config:
+            return
+        
+        if not self.get_is_jailed(ctx.guild.id, ctx.author.id):
+            await ctx.send("You are not currently in jail!")
+            return
+
+        counter = BeanCoinCounter.get_or_none(
+            (BeanCoinCounter.server_id == ctx.guild.id) &
+            (BeanCoinCounter.user_id == ctx.author.id)
+        )
+        coins = counter.count if counter else 0
+
+        botname = self.bot.user.display_name
+        jaileduser = ctx.author.mention
+
+        if coins >= config.bribe_cost:
+            counter.count -= config.bribe_cost
+            counter.save()
+
+            # Free the user
+            await self.data_set_user_free(ctx.guild.id, ctx.author.id)
+            role = ctx.guild.get_role(config.jailed_role_id)
+            if role:
+                try:
+                    await ctx.author.remove_roles(role, reason="Bribed the bot.")
+                except discord.Forbidden:
+                    self.logger.warning(f"Could not remove jail role from {ctx.author.id}")
+
+            if config.bribe_success_scripts:
+                script = random.choice(config.bribe_success_scripts)
+                await ctx.send(script.format(botname=botname, jaileduser=jaileduser))
+        else:
+            if config.bribe_failure_scripts:
+                script = random.choice(config.bribe_failure_scripts)
+                await ctx.send(script.format(botname=botname, jaileduser=jaileduser))
+            # Throw a tomato for attempting to bribe without enough coins
+            try:
+                await ctx.message.add_reaction(config.tomato_emoji)
+            except Exception:
+                pass
+
     @jail_group.command(name="current", help="Shows who is currently in jail.")
     @commands.guild_only()
     async def jail_current(self, ctx: commands.Context):
@@ -668,6 +794,32 @@ class JailCog(commands.Cog):
         message = f"**Jail Stats for {member.display_name}**\n"
         message += f"- Times in jail: {total_jail_time}\n"
         message += f"- Tomatoes thrown at them: {tomatoes_thrown}"
+
+        await ctx.send(message)
+
+    @commands.command(name="wealth", help="Check your or someone else's BeanCoin wealth.")
+    @commands.guild_only()
+    async def wealth(self, ctx: commands.Context, *, member: Optional[discord.Member] = None):
+        if not ctx.guild:
+            return
+            
+        config_manager = getattr(self.bot, "config_manager", None)
+        if not config_manager or not ctx.guild:
+            return
+        bot_channel_id = config_manager.get_bot_channel_id(ctx.guild.id)
+        if bot_channel_id and ctx.channel.id != bot_channel_id:
+            return
+
+        target = member or ctx.author
+
+        counter = BeanCoinCounter.get_or_none(
+            (BeanCoinCounter.server_id == ctx.guild.id) & 
+            (BeanCoinCounter.user_id == target.id)
+        )
+        count = counter.count if counter else 0
+
+        message = f"**Wealth for {target.display_name}**\n"
+        message += f"- BeanCoins: {count}"
 
         await ctx.send(message)
 

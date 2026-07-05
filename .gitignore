@@ -10,6 +10,7 @@ cogs/classifier/datasets/
 data/
 data_backup_1/
 data_backup_2/
+tasks/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -73,6 +74,7 @@ cover/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+db.sqlite3-*
 
 # Flask stuff:
 instance/
