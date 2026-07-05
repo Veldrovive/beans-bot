@@ -418,6 +418,9 @@ class JailCog(commands.Cog):
         if giver_id == receiver_id:
             return # Can't give yourself coins
 
+        if time.time() - message.created_at.timestamp() > 3 * 24 * 60 * 60:
+            return # Message is older than 3 days
+
         # Deduplicate: check if this user already gave a coin for this message
         if BeanCoinHistory.select().where(
             (BeanCoinHistory.server_id == payload.guild_id) &
@@ -799,7 +802,7 @@ class JailCog(commands.Cog):
 
     @commands.command(name="wealth", help="Check your or someone else's BeanCoin wealth.")
     @commands.guild_only()
-    async def wealth(self, ctx: commands.Context, *, member: Optional[discord.Member] = None):
+    async def wealth(self, ctx: commands.Context, *, member_query: Optional[str] = None):
         if not ctx.guild:
             return
             
@@ -810,7 +813,14 @@ class JailCog(commands.Cog):
         if bot_channel_id and ctx.channel.id != bot_channel_id:
             return
 
-        target = member or ctx.author
+        if member_query:
+            try:
+                target = await commands.MemberConverter().convert(ctx, member_query)
+            except commands.MemberNotFound:
+                await ctx.send(f"Could not find anyone named '{member_query}'.")
+                return
+        else:
+            target = ctx.author
 
         counter = BeanCoinCounter.get_or_none(
             (BeanCoinCounter.server_id == ctx.guild.id) & 
