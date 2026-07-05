@@ -114,6 +114,16 @@ servers:
         - "What are you doing in the stocks {jailed_user}? You're free to go."
       forgotten_prisoner_scripts:
         - "You're not on the lists {jailed_user}. Well you must be here for a reason. Back in the stocks!"
+      bean_coin_emoji: "BeanCoin"
+      bribe_cost: 10
+      bribe_success_scripts:
+        - "The honorable {botname} has decided that {jaileduser} is innocent of their crime and must be released immediately!"
+        - "A generous donation! {jaileduser} is absolved of their sins!"
+        - "Huzzah! The coffers overflow! Coincidentally {jaileduser} walks free!"
+      bribe_failure_scripts:
+        - "FOR SHAME! {jaileduser} has attempted to bribe your competent and faithful bot! Tomato them!"
+        - "Did you think I could be bought so easily, {jaileduser}? Double the guard!"
+        - "A paltry sum for your soul, {jaileduser}! Your bribe is rejected!"
     birthday_confs:
       birthdays_message_channel_id: 1435678059138121788
       birthdays_message_id: 1491511145511518318
