@@ -124,6 +124,7 @@ class JailCogConfig:
     forgotten_prisoner_scripts: list[str] # Format: "{jailed_user}" - User found with role but no data, re-jailed
     bean_coin_emoji: str
     bribe_cost: int
+    max_coins_per_day: int
     bribe_success_scripts: list[str] # Format: "{botname}" and "{jaileduser}"
     bribe_failure_scripts: list[str] # Format: "{botname}" and "{jaileduser}"
 
@@ -428,6 +429,17 @@ class JailCog(commands.Cog):
             (BeanCoinHistory.message_id == payload.message_id)
         ).exists():
             return
+
+        # Check daily limit
+        one_day_ago = int(time.time() * 1000) - 24 * 60 * 60 * 1000
+        coins_given_today = BeanCoinHistory.select().where(
+            (BeanCoinHistory.server_id == payload.guild_id) &
+            (BeanCoinHistory.giver_user_id == giver_id) &
+            (BeanCoinHistory.timestamp > one_day_ago)
+        ).count()
+
+        if coins_given_today >= config.max_coins_per_day:
+            return # Hit daily limit
 
         # Add coin
         BeanCoinHistory.create(

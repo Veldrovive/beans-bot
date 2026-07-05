@@ -120,6 +120,7 @@ servers:
         - "You're not on the lists {jailed_user}. Well you must be here for a reason. Back in the stocks!"
       bean_coin_emoji: "BeanCoin"
       bribe_cost: 1
+      max_coins_per_day: 1
       bribe_success_scripts:
         - "The honorable {botname} has decided that {jaileduser} is innocent of their crime and must be released immediately!"
       bribe_failure_scripts:
