@@ -19,6 +19,7 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 import time
+import datetime
 import random
 from peewee import *
 import re
@@ -431,11 +432,12 @@ class JailCog(commands.Cog):
             return
 
         # Check daily limit
-        one_day_ago = int(time.time() * 1000) - 24 * 60 * 60 * 1000
+        midnight = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        start_of_day = int(midnight.timestamp() * 1000)
         coins_given_today = BeanCoinHistory.select().where(
             (BeanCoinHistory.server_id == payload.guild_id) &
             (BeanCoinHistory.giver_user_id == giver_id) &
-            (BeanCoinHistory.timestamp > one_day_ago)
+            (BeanCoinHistory.timestamp > start_of_day) # type: ignore
         ).count()
 
         if coins_given_today >= config.max_coins_per_day:
