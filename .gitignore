@@ -8,8 +8,7 @@ docker_db/
 cogs/classifier/cache/
 cogs/classifier/datasets/
 data/
-data_backup_1/
-data_backup_2/
+data_backup_*/
 tasks/
 
 # Byte-compiled / optimized / DLL files
