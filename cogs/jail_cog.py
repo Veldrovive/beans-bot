@@ -441,6 +441,12 @@ class JailCog(commands.Cog):
         ).count()
 
         if coins_given_today >= config.max_coins_per_day:
+            if payload.member:
+                try:
+                    self.logger.info(f"Removing {payload.emoji} from message {message.id} in guild {payload.guild_id} for user {payload.user_id}")
+                    await message.remove_reaction(payload.emoji, payload.member)
+                except Exception:
+                    pass
             return # Hit daily limit
 
         # Add coin
