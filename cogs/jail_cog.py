@@ -1294,8 +1294,20 @@ class JailCog(commands.Cog):
         )
         count = counter.count if counter else 0
 
+        given_count = BeanCoinHistory.select().where(
+            (BeanCoinHistory.server_id == ctx.guild.id) &
+            (BeanCoinHistory.giver_user_id == target.id)
+        ).count()
+
+        received_count = BeanCoinHistory.select().where(
+            (BeanCoinHistory.server_id == ctx.guild.id) &
+            (BeanCoinHistory.receiver_user_id == target.id)
+        ).count()
+
         message = f"**Wealth for {target.display_name}**\n"
-        message += f"- BeanCoins: {count}"
+        message += f"- BeanCoins: {count}\n"
+        message += f"- Total Received: {received_count}\n"
+        message += f"- Total Given: {given_count}"
 
         await ctx.send(message)
 
