@@ -1307,7 +1307,7 @@ class JailCog(commands.Cog):
         message = f"**Current wealth for {target.display_name}**\n"
         message += f"- BeanCoins: {count}\n"
 
-        message = f"\n**Overall**\n"
+        message += f"\n**Overall**\n"
         message += f"- Total Received: {received_count}\n"
         message += f"- Total Gifted to others: {given_count}"
 
