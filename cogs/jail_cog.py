@@ -23,6 +23,9 @@ import datetime
 import random
 from peewee import *
 import re
+import json
+import math
+import asyncio
 
 db_proxy = Proxy()
 
@@ -107,6 +110,30 @@ class BeanCoinHistory(Model):
         database = db_proxy
 
 
+class PredictionMarket(Model):
+    server_id = BigIntegerField()
+    thread_id = BigIntegerField(primary_key=True)
+    creator_id = BigIntegerField()
+    status = CharField() # 'open', 'closed', 'resolved', 'canceled'
+    choices = TextField() # JSON list of strings
+    created_at = BigIntegerField()
+    resolved_at = BigIntegerField(null=True)
+    winning_choice = CharField(null=True)
+
+    class Meta:
+        database = db_proxy
+
+class MarketBet(Model):
+    market = ForeignKeyField(PredictionMarket, backref='bets')
+    user_id = BigIntegerField()
+    choice = CharField()
+    amount = IntegerField()
+    timestamp = BigIntegerField()
+
+    class Meta:
+        database = db_proxy
+        primary_key = CompositeKey('market', 'user_id')
+
 @dataclass
 class JailCogConfig:
     jail_emoji: str
@@ -139,7 +166,7 @@ class JailCog(commands.Cog):
         self.db = self.bot.config_manager.open_peewee_store("jail_cog.db")
         db_proxy.initialize(self.db)
         self.db.connect()
-        self.db.create_tables([JailedUser, HistoricalJailedUser, TomatoCounter, TomatoHistory, UsedMessage, PendingRename, BeanCoinCounter, BeanCoinHistory])
+        self.db.create_tables([JailedUser, HistoricalJailedUser, TomatoCounter, TomatoHistory, UsedMessage, PendingRename, BeanCoinCounter, BeanCoinHistory, PredictionMarket, MarketBet])
 
         # Start the background task to check for jail releases
         self.check_jail_timers.start()
@@ -602,6 +629,188 @@ class JailCog(commands.Cog):
         await self.handle_humiliation(message)
         await self.handle_name_change(message)
 
+    @commands.Cog.listener()
+    async def on_thread_create(self, thread: discord.Thread):
+        self.logger.info(f"New thread created! {thread.guild} {thread.parent}")
+        if not thread.guild:
+            return
+
+        config_manager = getattr(self.bot, "config_manager", None)
+        if not config_manager:
+            return
+
+        gambling_config = config_manager.get_gambling_config(thread.guild.id)
+        self.logger.info(f"Gambling config: {gambling_config}")
+        if not gambling_config:
+            return
+
+        forum_channel_id = gambling_config.get("forum_channel_id")
+        self.logger.info(f"Forum channel id: {forum_channel_id}, {thread.parent_id}")
+        if not forum_channel_id or thread.parent_id != forum_channel_id:
+            return
+        
+        # Wait a tiny bit to make sure starter message is available
+        await asyncio.sleep(1)
+
+        try:
+            starter_message = await thread.fetch_message(thread.id)
+        except discord.NotFound:
+            return
+
+        content = starter_message.content
+
+        # Parse choices
+        choices = []
+        in_choices = False
+        for line in content.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if line.lower().startswith("choices:"):
+                in_choices = True
+                continue
+            if in_choices:
+                if line:
+                    choices.append(line.lower())
+        
+        if not choices:
+            await thread.send("This is not a valid prediction. It must contain `Choices:` followed by a list of choices on new lines. Closing thread.")
+            await thread.edit(locked=True, archived=True)
+            return
+
+        if len(choices) < 2:
+            await thread.send("This is not a valid prediction. It must contain at least two choices. Closing thread.")
+            await thread.edit(locked=True, archived=True)
+            return
+
+        # Check for keywords in the choices
+        keywords = ["close", "cancel", "wins"]
+        invalid_choices = []
+        for choice in choices:
+            for keyword in keywords:
+                if keyword in choice:
+                    invalid_choices.append(choice)
+                    break
+        
+        if invalid_choices:
+            await thread.send(f"The choices may not include the words 'close', 'stop', 'cancel', or 'wins'. Closing thread.")
+            await thread.edit(locked=True, archived=True)
+            return
+
+        # Check that all choices are only one word
+        multi_word_choices = [c for c in choices if " " in c]
+        if multi_word_choices:
+            await thread.send(f"The choices may not include spaces. Please use underscores or hyphens instead. Closing thread.")
+            await thread.edit(locked=True, archived=True)
+            return
+
+        # Check that there are no duplicate lowercase choices
+        lowercase_choices = [c.lower() for c in choices]
+        choices_with_duplicates = [c for c in set(lowercase_choices) if lowercase_choices.count(c) > 1]
+        if choices_with_duplicates:
+            await thread.send(f"There are duplicates of the same choice: {', '.join(choices_with_duplicates)}.\nClosing thread.")
+            await thread.edit(locked=True, archived=True)
+            return
+
+        market = PredictionMarket.create(
+            server_id=thread.guild.id,
+            thread_id=thread.id,
+            creator_id=starter_message.author.id,
+            status='open',
+            choices=json.dumps(choices),
+            created_at=int(time.time() * 1000)
+        )
+
+        instructions = "Time to gamble!\n\nUse the commands\n"
+        for choice in choices:
+            instructions += f"- !bet {choice} <number of coins to bet>\n"
+        instructions += f"For example, \"!bet {choices[0]} 10\"\nYou may only choose one option."
+        instructions += f"\n- Check the pool and odds: !bet stats"
+        instructions += f"\n\nCommands for the prediction market manager, <@{starter_message.author.id}>:"
+        instructions += f"\n- Close betting and refund everyone: !bet cancel"
+        instructions += f"\n- Close betting without naming a winner yet: !bet close"
+        instructions += f"\n- Close betting and name a winner: !bet wins <winning choice>"
+
+        await thread.send(instructions)
+
+        bot_betting_config = gambling_config.get("bot_betting", {})
+        if bot_betting_config.get("enabled", False) and self.bot.user:
+            bot_counter = BeanCoinCounter.get_or_none(
+                (BeanCoinCounter.server_id == thread.guild.id) &
+                (BeanCoinCounter.user_id == self.bot.user.id)
+            )
+            bot_balance = bot_counter.count if bot_counter else 0
+            min_bot_balance = bot_betting_config.get("min_bot_balance", 100)
+            
+            if bot_balance >= min_bot_balance:
+                bet_probability = bot_betting_config.get("bet_probability", 0.5)
+                if random.random() < bet_probability:
+                    bet_proportion = bot_betting_config.get("bet_proportion", 0.1)
+                    max_bot_bet = bot_betting_config.get("max_bot_bet", 50)
+                    bet_amount = int(min(bot_balance * bet_proportion, max_bot_bet))
+                    
+                    if bet_amount > 0:
+                        chosen_option = random.choice(choices)
+                        if bot_counter:
+                            bot_counter.count -= bet_amount
+                            bot_counter.save()
+                        
+                        MarketBet.create(
+                            market=market,
+                            user_id=self.bot.user.id,
+                            choice=chosen_option,
+                            amount=bet_amount,
+                            timestamp=int(time.time() * 1000)
+                        )
+                        await thread.send(f"I am joining the fray! I bet {bet_amount} on {chosen_option}!")
+
+    @commands.Cog.listener()
+    async def on_thread_delete(self, thread: discord.Thread):
+        self.logger.info(f"Thread was deleted! {thread}")
+        if not thread.guild:
+            return
+
+        config_manager = getattr(self.bot, "config_manager", None)
+        if not config_manager:
+            return
+
+        gambling_config = config_manager.get_gambling_config(thread.guild.id)
+        if not gambling_config:
+            return
+
+        forum_channel_id = gambling_config.get("forum_channel_id")
+        if not forum_channel_id or thread.parent_id != forum_channel_id:
+            return
+
+        # Check if this thread corresponds to a predictions
+        market = PredictionMarket.get_or_none(PredictionMarket.thread_id == thread.id)
+        if not market:
+            return
+            
+        # Check if the prediction this thread corresponds to is open
+        self.logger.info(f"Thread that was deleted corresponds to a market, does it have open markets?")
+        if market.status in ['resolved', 'canceled']:
+            self.logger.info(f"Market {market.thread_id} is already closed.")
+            return
+            
+        self.logger.info(f"Market {market.thread_id} is open, refunding all bets.")
+        # If it is open, perform the cancel operation and so refund all bets
+        bets = MarketBet.select().where(MarketBet.market == market)
+        self.logger.info(f"Found {len(bets)} bets on market {market.thread_id}.")
+        for bet in bets:
+            counter, _ = BeanCoinCounter.get_or_create(
+                server_id=market.server_id,
+                user_id=bet.user_id,
+                defaults={'count': 0}
+            )
+            counter.count += bet.amount
+            counter.save()
+            self.logger.info(f"Refunding {bet.user_id} {bet.amount} coins for market {market.thread_id}.")
+
+        market.status = 'canceled'
+        market.save()
+        self.logger.info(f"Prediction market {market.thread_id} was canceled due to thread deletion.")
+
     @tasks.loop(seconds=60)
     async def check_jail_timers(self):
         """
@@ -799,6 +1008,206 @@ class JailCog(commands.Cog):
 
         mentions = [f"<@{user.user_id}>" for user in jailed_users]
         await ctx.send(f"Currently in jail: {', '.join(mentions)}")
+
+    @commands.command(name="bet")
+    @commands.guild_only()
+    async def bet_command(self, ctx: commands.Context, arg1: str, arg2: Optional[str] = None):
+        if not ctx.guild:
+            return
+            
+        thread_id = ctx.channel.id
+        market = PredictionMarket.get_or_none(PredictionMarket.thread_id == thread_id)
+        if not market:
+            return # Ignore if not in a market thread
+            
+        arg1 = arg1.lower()
+        
+        if arg1 == "stats":
+            bets = list(MarketBet.select().where(MarketBet.market == market))
+            if not bets:
+                await ctx.send("No bets have been placed yet.")
+                return
+            
+            total_pool = sum(b.amount for b in bets)
+            choices = json.loads(market.choices)
+            choice_totals = {c: 0 for c in choices}
+            
+            for bet in bets:
+                choice_totals[bet.choice] += bet.amount
+                
+            stats_message = f"**Current Pool:** {total_pool} BeanCoins\n\n**Odds:**\n"
+            for choice in choices:
+                total_for_choice = choice_totals[choice]
+                if total_for_choice == 0:
+                    stats_message += f"- **{choice}**: 0 BeanCoins bet (No payout)\n"
+                else:
+                    multiplier = total_pool / total_for_choice
+                    stats_message += f"- **{choice}**: {total_for_choice} BeanCoins bet (Payout ratio: {multiplier:.2f}x)\n"
+            
+            await ctx.send(stats_message)
+            return
+
+        # Creator commands
+        if arg1 in ["close", "cancel", "wins"]:
+            if ctx.author.id != market.creator_id:
+                await ctx.send("Only the creator of the prediction can use this command.")
+                return
+                
+            if arg1 in ["close"]:
+                if market.status != 'open':
+                    await ctx.send(f"Market is already {market.status}.")
+                    return
+                market.status = 'closed'
+                market.save()
+                await ctx.send("Betting has been closed.")
+                return
+                
+            if arg1 == "cancel":
+                if market.status in ['resolved', 'canceled']:
+                    await ctx.send(f"Market is already {market.status}.")
+                    return
+                # Refund everyone
+                bets = MarketBet.select().where(MarketBet.market == market)
+                for bet in bets:
+                    counter, _ = BeanCoinCounter.get_or_create(
+                        server_id=market.server_id,
+                        user_id=bet.user_id,
+                        defaults={'count': 0}
+                    )
+                    counter.count += bet.amount
+                    counter.save()
+                    
+                market.status = 'canceled'
+                market.save()
+                await ctx.send("Prediction canceled. All bets have been refunded.")
+                return
+                
+            if arg1 == "wins":
+                if market.status in ['resolved', 'canceled']:
+                    await ctx.send(f"Market is already {market.status}.")
+                    return
+                    
+                if not arg2:
+                    await ctx.send("Please specify the winning option (e.g., `!bet wins yes`).")
+                    return
+                    
+                winning_choice = arg2.lower()
+                choices = json.loads(market.choices)
+                if winning_choice not in choices:
+                    await ctx.send(f"Invalid option '{winning_choice}'. Valid choices: {', '.join(choices)}")
+                    return
+                    
+                market.status = 'resolved'
+                market.resolved_at = int(time.time() * 1000)
+                market.winning_choice = winning_choice
+                market.save()
+                
+                # Payout logic
+                bets = list(MarketBet.select().where(MarketBet.market == market))
+                total_pool = sum(b.amount for b in bets)
+                winning_bets = [b for b in bets if b.choice == winning_choice]
+                total_winning_bets = sum(b.amount for b in winning_bets)
+                
+                if total_pool == 0:
+                    await ctx.send("The prediction resolved, but no one bet anything!")
+                    return
+                    
+                if total_winning_bets == 0 or total_winning_bets == total_pool:
+                    # Everyone loses or everyone wins, refund
+                    for bet in bets:
+                        counter, _ = BeanCoinCounter.get_or_create(
+                            server_id=market.server_id,
+                            user_id=bet.user_id,
+                            defaults={'count': 0}
+                        )
+                        counter.count += bet.amount
+                        counter.save()
+                    await ctx.send(f"The prediction resolved to **{winning_choice}**. But nobody bet differently so everyone gets their beans back.")
+                    return
+                    
+                total_payout = 0
+                payout_message = "Win amounts:"
+                for bet in winning_bets:
+                    proportion = bet.amount / total_winning_bets
+                    payout = math.floor(total_pool * proportion)
+                    total_payout += payout
+                    
+                    counter, _ = BeanCoinCounter.get_or_create(
+                        server_id=market.server_id,
+                        user_id=bet.user_id,
+                        defaults={'count': 0}
+                    )
+                    counter.count += payout
+                    counter.save()
+                    payout_message += f"\n- <@{bet.user_id}>: {payout}"
+                    
+                remainder = total_pool - total_payout
+                if remainder > 0 and self.bot.user:
+                    bot_counter, _ = BeanCoinCounter.get_or_create(
+                        server_id=market.server_id,
+                        user_id=self.bot.user.id,
+                        defaults={'count': 0}
+                    )
+                    bot_counter.count += remainder
+                    bot_counter.save()
+                payout_message += f"\nAnd the house took {remainder} beans."
+
+                await ctx.send(f"The prediction resolved to **{winning_choice}**! {payout_message}")
+                return
+
+        # It's a bet!
+        if market.status != 'open':
+            await ctx.send(f"Betting is currently {market.status}.")
+            return
+            
+        choices = json.loads(market.choices)
+        if arg1 not in choices:
+            await ctx.send(f"Invalid option '{arg1}'. Valid choices: {', '.join(choices)}")
+            return
+            
+        if not arg2:
+            await ctx.send("Please specify an amount to bet (e.g., `!bet yes 10`).")
+            return
+            
+        try:
+            amount = int(arg2)
+        except ValueError:
+            await ctx.send("Amount must be a number.")
+            return
+            
+        if amount <= 0:
+            await ctx.send("Amount must be greater than 0.")
+            return
+            
+        # Check if user already bet
+        if MarketBet.select().where((MarketBet.market == market) & (MarketBet.user_id == ctx.author.id)).exists():
+            await ctx.send("You have already placed a bet on this prediction!")
+            return
+            
+        # Check balance
+        counter, _ = BeanCoinCounter.get_or_create(
+            server_id=market.server_id,
+            user_id=ctx.author.id,
+            defaults={'count': 0}
+        )
+        if counter.count < amount:
+            await ctx.send(f"You don't have enough Bean Coins! You only have {counter.count}.")
+            return
+            
+        # Deduct balance
+        counter.count -= amount
+        counter.save()
+        
+        # Save bet
+        MarketBet.create(
+            market=market,
+            user_id=ctx.author.id,
+            choice=arg1,
+            amount=amount,
+            timestamp=int(time.time() * 1000)
+        )
+        
+        await ctx.send(f"{ctx.author.mention} bet {amount} on **{arg1}**!")
 
     @jail_group.command(name="info", help="Shows stats about a specific person's jail time.")
     @commands.guild_only()
