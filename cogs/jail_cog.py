@@ -1304,10 +1304,12 @@ class JailCog(commands.Cog):
             (BeanCoinHistory.receiver_user_id == target.id)
         ).count()
 
-        message = f"**Wealth for {target.display_name}**\n"
+        message = f"**Current wealth for {target.display_name}**\n"
         message += f"- BeanCoins: {count}\n"
+
+        message = f"\n**Overall**\n"
         message += f"- Total Received: {received_count}\n"
-        message += f"- Total Given: {given_count}"
+        message += f"- Total Gifted to others: {given_count}"
 
         await ctx.send(message)
 
