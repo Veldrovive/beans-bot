@@ -750,6 +750,16 @@ class JailCog(commands.Cog):
             counter.count -= config.bribe_cost
             counter.save()
 
+            # Give the bot the bean coins
+            if self.bot.user:
+                bot_counter, _ = BeanCoinCounter.get_or_create(
+                    server_id=ctx.guild.id,
+                    user_id=self.bot.user.id,
+                    defaults={'count': 0}
+                )
+                bot_counter.count += config.bribe_cost
+                bot_counter.save()
+
             # Free the user
             await self.data_set_user_free(ctx.guild.id, ctx.author.id)
             role = ctx.guild.get_role(config.jailed_role_id)
