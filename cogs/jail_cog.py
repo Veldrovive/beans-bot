@@ -725,7 +725,8 @@ class JailCog(commands.Cog):
         for choice in choices:
             instructions += f"- !bet {choice} <number of coins to bet>\n"
         instructions += f"For example, \"!bet {choices[0]} 10\"\nYou may only choose one option."
-        instructions += f"\n- Check the pool and odds: !bet stats"
+        instructions += f"\nHowever, if you want to lose more money you can use \"!bet add <number>\" to increase your bet."
+        instructions += f"\nCheck the pool and odds: !bet stats"
         instructions += f"\n\nCommands for the prediction market manager, <@{starter_message.author.id}>:"
         instructions += f"\n- Close betting and refund everyone: !bet cancel"
         instructions += f"\n- Close betting without naming a winner yet: !bet close"
@@ -1154,6 +1155,51 @@ class JailCog(commands.Cog):
 
                 await ctx.send(f"The prediction resolved to **{winning_choice}**! {payout_message}")
                 return
+
+        if arg1 == "add":
+            if market.status != 'open':
+                await ctx.send(f"Betting is currently {market.status}.")
+                return
+                
+            if not arg2:
+                await ctx.send("Please specify an amount to add to your bet (e.g., `!bet add 10`).")
+                return
+                
+            try:
+                amount = int(arg2)
+            except ValueError:
+                await ctx.send("Amount must be a number.")
+                return
+                
+            if amount <= 0:
+                await ctx.send("Amount must be greater than 0.")
+                return
+                
+            existing_bet = MarketBet.get_or_none((MarketBet.market == market) & (MarketBet.user_id == ctx.author.id))
+            if not existing_bet:
+                await ctx.send("You have not placed a bet yet. Place a bet first before adding to it.")
+                return
+                
+            # Check balance
+            counter, _ = BeanCoinCounter.get_or_create(
+                server_id=market.server_id,
+                user_id=ctx.author.id,
+                defaults={'count': 0}
+            )
+            if counter.count < amount:
+                await ctx.send(f"You don't have enough Bean Coins! You only have {counter.count}.")
+                return
+                
+            # Deduct balance
+            counter.count -= amount
+            counter.save()
+            
+            # Update bet
+            existing_bet.amount += amount
+            existing_bet.save()
+            
+            await ctx.send(f"{ctx.author.mention} added {amount} to their bet on **{existing_bet.choice}**! New total: {existing_bet.amount}.")
+            return
 
         # It's a bet!
         if market.status != 'open':
