@@ -830,6 +830,33 @@ class JailCog(commands.Cog):
 
         await ctx.send(message)
 
+    @jail_group.command(name="leaderboard", help="Shows who has been jailed the most.")
+    @commands.guild_only()
+    async def jail_leaderboard(self, ctx: commands.Context):
+        config_manager = getattr(self.bot, "config_manager", None)
+        if not config_manager or not ctx.guild:
+            return
+        bot_channel_id = config_manager.get_bot_channel_id(ctx.guild.id)
+        if bot_channel_id and ctx.channel.id != bot_channel_id:
+            return
+
+        jail_counts = {}
+        for user in JailedUser.select().where(JailedUser.server_id == ctx.guild.id):
+            jail_counts[user.user_id] = jail_counts.get(user.user_id, 0) + 1
+        for user in HistoricalJailedUser.select().where(HistoricalJailedUser.server_id == ctx.guild.id):
+            jail_counts[user.user_id] = jail_counts.get(user.user_id, 0) + 1
+
+        sorted_jail = sorted(jail_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+
+        if not sorted_jail:
+            await ctx.send("No one has been jailed yet!")
+            return
+
+        message = "**Jail Leaderboard**\n"
+        for i, (user_id, count) in enumerate(sorted_jail, 1):
+            message += f"{i}. <@{user_id}>: {count} times\n"
+        await ctx.send(message, allowed_mentions=discord.AllowedMentions.none())
+
     @commands.command(name="wealth", help="Check your or someone else's BeanCoin wealth.")
     @commands.guild_only()
     async def wealth(self, ctx: commands.Context, *, member_query: Optional[str] = None):
@@ -862,4 +889,43 @@ class JailCog(commands.Cog):
         message += f"- BeanCoins: {count}"
 
         await ctx.send(message)
+
+    @commands.group(name="coin", invoke_without_command=True)
+    @commands.guild_only()
+    async def coin_group(self, ctx: commands.Context):
+        """Commands to see coin stats."""
+        config_manager = getattr(self.bot, "config_manager", None)
+        if not config_manager or not ctx.guild:
+            return
+        bot_channel_id = config_manager.get_bot_channel_id(ctx.guild.id)
+        if bot_channel_id and ctx.channel.id != bot_channel_id:
+            return
+        await ctx.send_help(ctx.command)
+
+    @coin_group.command(name="leaderboard", help="Shows who has the most BeanCoins.")
+    @commands.guild_only()
+    async def coin_leaderboard(self, ctx: commands.Context):
+        config_manager = getattr(self.bot, "config_manager", None)
+        if not config_manager or not ctx.guild:
+            return
+        bot_channel_id = config_manager.get_bot_channel_id(ctx.guild.id)
+        if bot_channel_id and ctx.channel.id != bot_channel_id:
+            return
+
+        coin_counts = {}
+        for counter in BeanCoinCounter.select().where(BeanCoinCounter.server_id == ctx.guild.id):
+            if counter.count > 0:
+                coin_counts[counter.user_id] = counter.count
+        
+        sorted_coins = sorted(coin_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+
+        if not sorted_coins:
+            await ctx.send("No one has any BeanCoins yet!")
+            return
+
+        message = "**BeanCoin Leaderboard**\n"
+        for i, (user_id, count) in enumerate(sorted_coins, 1):
+            message += f"{i}. <@{user_id}>: {count} BeanCoins\n"
+            
+        await ctx.send(message, allowed_mentions=discord.AllowedMentions.none())
 
