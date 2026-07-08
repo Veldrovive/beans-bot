@@ -144,3 +144,11 @@ servers:
         high_fat_cow_threshold: 1.5
         high_fat_cow_emoji: "🇭,🇴,🇼,❓"
         very_high_fat_cow_emoji: "tojail"
+    gambling_confs:
+      forum_channel_id: 1524436342665248898
+      bot_betting:
+        enabled: true
+        min_bot_balance: 10
+        bet_probability: 0.5
+        bet_proportion: 0.1
+        max_bot_bet: 50
