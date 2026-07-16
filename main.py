@@ -58,6 +58,15 @@ class Bot(commands.Bot):
         self.db = DB(DB_FILE)
         self.gemini_harness = GeminiHarness()
 
+        logging.info("Testing Gemini API key...")
+        try:
+            response = self.gemini_harness.generate("Respond with the exact word 'pong'")
+            response_text = response.text.strip() if response.text else "<No text returned>"
+            logging.info(f"Gemini API test successful. Response: {response_text}")
+        except Exception as e:
+            logging.error(f"Gemini API test failed: {e}")
+            raise RuntimeError(f"Gemini API test failed: {e}")
+
         if self.db.get_state("message_count") is None:
             self.db.set_state("message_count", 0)
 
