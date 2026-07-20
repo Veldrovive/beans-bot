@@ -736,34 +736,41 @@ class JailCog(commands.Cog):
 
         bot_betting_config = gambling_config.get("bot_betting", {})
         if bot_betting_config.get("enabled", False) and self.bot.user:
-            bot_counter = BeanCoinCounter.get_or_none(
-                (BeanCoinCounter.server_id == thread.guild.id) &
-                (BeanCoinCounter.user_id == self.bot.user.id)
+            bot_counter, _ = BeanCoinCounter.get_or_create(
+                server_id=thread.guild.id,
+                user_id=self.bot.user.id,
+                defaults={'count': 0}
             )
-            bot_balance = bot_counter.count if bot_counter else 0
-            min_bot_balance = bot_betting_config.get("min_bot_balance", 100)
+            bot_balance = bot_counter.count
             
-            if bot_balance >= min_bot_balance:
-                bet_probability = bot_betting_config.get("bet_probability", 0.5)
-                if random.random() < bet_probability:
-                    bet_proportion = bot_betting_config.get("bet_proportion", 0.1)
-                    max_bot_bet = bot_betting_config.get("max_bot_bet", 50)
-                    bet_amount = int(min(bot_balance * bet_proportion, max_bot_bet))
+            bet_probability = bot_betting_config.get("bet_probability", 0.5)
+            if random.random() < bet_probability:
+                bet_proportion = bot_betting_config.get("bet_proportion", 0.1)
+                max_bot_bet = bot_betting_config.get("max_bot_bet", 50)
+                
+                # Normal bet ignores negative balance when calculating proportion
+                normal_bet = int(min(max(bot_balance, 0) * bet_proportion, max_bot_bet))
+                
+                # The minimum bot bet range (floor)
+                min_bot_bet_range = bot_betting_config.get("min_bot_bet_range", [1, 4])
+                floor_amount = random.randint(min_bot_bet_range[0], min_bot_bet_range[1])
+                
+                # Take whichever is higher: the normal calculation or the floor
+                bet_amount = max(normal_bet, floor_amount)
+                
+                if bet_amount > 0:
+                    chosen_option = random.choice(choices)
+                    bot_counter.count -= bet_amount
+                    bot_counter.save()
                     
-                    if bet_amount > 0:
-                        chosen_option = random.choice(choices)
-                        if bot_counter:
-                            bot_counter.count -= bet_amount
-                            bot_counter.save()
-                        
-                        MarketBet.create(
-                            market=market,
-                            user_id=self.bot.user.id,
-                            choice=chosen_option,
-                            amount=bet_amount,
-                            timestamp=int(time.time() * 1000)
-                        )
-                        await thread.send(f"I am joining the fray! I bet {bet_amount} on {chosen_option}!")
+                    MarketBet.create(
+                        market=market,
+                        user_id=self.bot.user.id,
+                        choice=chosen_option,
+                        amount=bet_amount,
+                        timestamp=int(time.time() * 1000)
+                    )
+                    await thread.send(f"I am joining the fray! I bet {bet_amount} on {chosen_option}!")
 
     @commands.Cog.listener()
     async def on_thread_delete(self, thread: discord.Thread):

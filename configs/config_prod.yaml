@@ -148,7 +148,7 @@ servers:
       forum_channel_id: 1524436342665248898
       bot_betting:
         enabled: true
-        min_bot_balance: 10
-        bet_probability: 0.5
+        min_bot_bet_range: [1, 4]
+        bet_probability: 1.0
         bet_proportion: 0.1
         max_bot_bet: 50
