@@ -141,8 +141,10 @@ class ActionHolidayCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        for guild in self.bot.guilds:
-            await self.check_and_send_holiday(guild.id)
+        now = datetime.datetime.now(tz)
+        if now.timetz() >= scheduled_time:
+            for guild in self.bot.guilds:
+                await self.check_and_send_holiday(guild.id)
 
     @check_and_send_holiday_task.before_loop
     async def before_check_and_send_holiday_task(self):

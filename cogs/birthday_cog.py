@@ -407,8 +407,10 @@ class BirthdayCog(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print("on_ready")
-        for guild in self.bot.guilds:
-            await self.check_and_send_birthday_messages(guild.id)
+        now = datetime.datetime.now(tz)
+        if now.timetz() >= scheduled_time:
+            for guild in self.bot.guilds:
+                await self.check_and_send_birthday_messages(guild.id)
 
     @check_and_send_birthday_messages_task.before_loop
     async def before_check_and_send_birthday_messages_task(self):
