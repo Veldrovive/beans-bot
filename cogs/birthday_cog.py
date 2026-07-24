@@ -406,25 +406,25 @@ class BirthdayCog(commands.Cog):
     # We also run this on startup in case the bot was down on a birthday
     @commands.Cog.listener()
     async def on_ready(self):
-        print("on_ready")
+        self.logger.info("on_ready")
         now = datetime.datetime.now(tz)
         
         try:
             holidays = await scrapers.get_holidays(now.day, now.month, now.year)
-            print(f"Test scrapers (birthday): Found {len(holidays)} holidays today.")
+            self.logger.info(f"Test scrapers (birthday): Found {len(holidays)} holidays today.")
             if holidays:
                 reason, holiday = scrapers.get_best_holiday(holidays, self.bot.gemini_harness)
                 if holiday:
-                    print(f"Test scrapers (birthday): Best holiday: {holiday.name} because {reason}")
+                    self.logger.info(f"Test scrapers (birthday): Best holiday: {holiday.name} because {reason}")
 
             on_this_day = await scrapers.get_on_this_day(now.day, now.month)
-            print(f"Test scrapers (birthday): Found {len(on_this_day)} on this day events today.")
+            self.logger.info(f"Test scrapers (birthday): Found {len(on_this_day)} on this day events today.")
             if on_this_day:
                 reason, event = scrapers.get_best_on_this_day(on_this_day, self.bot.gemini_harness)
                 if event:
-                    print(f"Test scrapers (birthday): Best on this day: {event.description} because {reason}")
+                    self.logger.info(f"Test scrapers (birthday): Best on this day: {event.description} because {reason}")
         except Exception as e:
-            print(f"Test scrapers (birthday) failed: {e}")
+            self.logger.warning(f"Test scrapers (birthday) failed: {e}")
 
         if now.timetz() >= scheduled_time:
             for guild in self.bot.guilds:

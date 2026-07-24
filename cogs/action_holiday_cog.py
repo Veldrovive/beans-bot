@@ -145,13 +145,13 @@ class ActionHolidayCog(commands.Cog):
         
         try:
             action_holidays = await self.get_action_holidays(now.day, now.month, now.year)
-            print(f"Test scrapers (action_holidays): Found {len(action_holidays)} action holidays today.")
+            self.logger.info(f"Test scrapers (action_holidays): Found {len(action_holidays)} action holidays today.")
             if action_holidays:
                 reason, action = scrapers.get_best_holiday(action_holidays, self.bot.gemini_harness)
                 if action:
-                    print(f"Test scrapers (action_holidays): Best action holiday: {action.name} because {reason}")
+                    self.logger.info(f"Test scrapers (action_holidays): Best action holiday: {action.name} because {reason}")
         except Exception as e:
-            print(f"Test scrapers (action_holidays) failed: {e}")
+            self.logger.warning(f"Test scrapers (action_holidays) failed: {e}")
 
         if now.timetz() >= scheduled_time:
             for guild in self.bot.guilds:
