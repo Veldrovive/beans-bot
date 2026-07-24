@@ -142,6 +142,17 @@ class ActionHolidayCog(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         now = datetime.datetime.now(tz)
+        
+        try:
+            action_holidays = await self.get_action_holidays(now.day, now.month, now.year)
+            print(f"Test scrapers (action_holidays): Found {len(action_holidays)} action holidays today.")
+            if action_holidays:
+                reason, action = scrapers.get_best_holiday(action_holidays, self.bot.gemini_harness)
+                if action:
+                    print(f"Test scrapers (action_holidays): Best action holiday: {action.name} because {reason}")
+        except Exception as e:
+            print(f"Test scrapers (action_holidays) failed: {e}")
+
         if now.timetz() >= scheduled_time:
             for guild in self.bot.guilds:
                 await self.check_and_send_holiday(guild.id)
