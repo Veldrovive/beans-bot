@@ -175,62 +175,78 @@ def scrape_on_this_day_events(html_content: str, day: int, month: int) -> list[O
     soup = BeautifulSoup(html_content, 'html.parser')
     events = []
 
-    # 1. Extract the Featured Event
-    featured_card = soup.select_one('.featured-event-card')
-    if featured_card:
-        year_tag = featured_card.select_one('.date-label')
-        desc_tag = featured_card.select_one('.description')
-        link_tag = featured_card.select_one('.title a')
-        
-        if year_tag and desc_tag and link_tag:
-            events.append(OnThisDayEvent(
-                day=day,
-                month=month,
-                year=int(year_tag.get_text(strip=True)),
-                description=desc_tag.get_text(strip=True),
-                link=link_tag.get('href', '')
-            ))
+    # Find all highlighted sections (ignoring standard <ul class="event-list">)
+    highlight_sections = soup.select('.section--highlight')
 
-    # 2. Extract the remaining "More Events"
-    for card in soup.select('.md-history-event'):
-        year_tag = card.select_one('.date-label')
-        body_tag = card.select_one('.card-body')
+    for section in highlight_sections:
+        # 1. Extract the title (e.g., "Battle of Nocera")
+        title_tag = section.select_one('.poi__heading-txt')
+        if not title_tag:
+            continue
+        title = title_tag.get_text(strip=True)
+
+        # 2. Locate the paragraph containing the year and description
+        # Usually, this is the first `<p>` tag inside the section.
+        p_tag = section.select_one('p')
+        if not p_tag:
+            continue
+
+        # 3. Extract the year 
+        date_tag = p_tag.select_one('.date')
+        if not date_tag:
+            continue
+            
+        try:
+            year = int(date_tag.get_text(strip=True))
+        except ValueError:
+            # Fallback if the date isn't a cleanly parsed year 
+            year = datetime.datetime.now().year
+            
+        # Remove the date tag from the DOM temporarily so it doesn't pollute our description text
+        date_tag.extract()
         
-        if year_tag and body_tag:
-            year_tag = year_tag.get_text(strip=True)
-            if year_tag.lower() == "today":
-                year = datetime.datetime.now().year
-            else:
-                year = int(year_tag)
-            
-            # The first anchor tag in the body usually represents the primary subject link
-            link_tag = body_tag.find('a')
-            link = link_tag.get('href', '') if link_tag else ''
-            
-            # Remove "Test your knowledge" quiz links and image credits to get a clean description
-            for unwanted in body_tag.select('.otd-he-link, .credit'):
-                unwanted.decompose()
-                
-            # Extract the remaining text
-            description = body_tag.get_text(separator=' ', strip=True)
-            
-            events.append(OnThisDayEvent(
-                day=day,
-                month=month,
-                year=year,
-                description=description,
-                link=link
-            ))
+        # Clean up the description and merge it with the highlighted title
+        # Strip trailing colons or spaces that might have been left next to the date
+        raw_desc = p_tag.get_text(separator=' ', strip=True).lstrip(': ')
+        description = f"{title}: {raw_desc}"
+
+        # 4. Extract the most relevant link
+        # Priority 1: An article link in the header (e.g., `<a class="section__link">`)
+        link_tag = section.select_one('.poi__heading a.section__link')
+        if not link_tag:
+            # Priority 2: The first embedded link in the description (often the primary subject)
+            link_tag = p_tag.select_one('a')
+
+        link = link_tag.get('href', '') if link_tag else ''
+        
+        # Resolve relative URLs to absolute URLs
+        if link.startswith('/'):
+            link = f"https://www.onthisday.com{link}"
+
+        events.append(OnThisDayEvent(
+            day=day,
+            month=month,
+            year=year,
+            description=description,
+            link=link
+        ))
 
     return events
 
 async def get_on_this_day(day: int, month: int) -> list[OnThisDayEvent]:
-    month_str = get_month_str(month)
-    url = f"https://www.britannica.com/on-this-day/{month_str}-{day}"
+    # onthisday.com uses full month names in its URL paths
+    month_str = datetime.date(2000, month, 1).strftime('%B').lower()
+    
+    url = f"https://www.onthisday.com/events/{month_str}/{day}"
+    
     async with httpx.AsyncClient() as client:
-        response = await client.get(url)
+        # Sites like this often block default Python User-Agents, so we supply a standard one.
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        response = await client.get(url, headers=headers)
+        
         if response.status_code != 200:
             raise Exception(f"Failed to get on this day from {url}: {response.status_code}")
+            
         return scrape_on_this_day_events(response.text, day, month)
 
 def get_best_on_this_day(events: list[OnThisDayEvent], gemini_harness) -> tuple[str | None, OnThisDayEvent | None]:
@@ -254,7 +270,7 @@ def get_best_on_this_day(events: list[OnThisDayEvent], gemini_harness) -> tuple[
 
 You are given a list of events that happened on a given day.
 Your job is to pick the best event to celebrate.
-We prefer lesser known and odd events.
+We prefer lesser known and odd events that are still important to history.
     """
 
     response = gemini_harness.generate(
@@ -284,7 +300,8 @@ if __name__ == "__main__":
         load_dotenv()
         gemini_harness = GeminiHarness()
 
-        test_day, test_month, test_year = 24, 12, 2025
+        # test_day, test_month, test_year = 24, 12, 2025
+        test_day, test_month, test_year = 18, 7, 2026
 
         holidays = await get_holidays(test_day, test_month, test_year)
         single_day_holidays = [h for h in holidays if h.type == HolidayType.SINGLE_DAY]
@@ -370,7 +387,7 @@ if __name__ == "__main__":
         print(f"\nFinished! Found {len(all_matches)} action holidays in {year}.")
 
     # Run the standard test:
-    asyncio.run(test_find_action_holidays())
+    asyncio.run(test())
 
     # Uncomment to run the full year scan for action holidays:
     # asyncio.run(test_find_action_holidays())
