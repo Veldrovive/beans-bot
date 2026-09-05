@@ -155,6 +155,7 @@ class JailCogConfig:
     max_coins_per_day: int
     bribe_success_scripts: list[str] # Format: "{botname}" and "{jaileduser}"
     bribe_failure_scripts: list[str] # Format: "{botname}" and "{jaileduser}"
+    subsequent_tomato_probability: float = 0.1
 
 
 class JailCog(commands.Cog):
@@ -533,21 +534,15 @@ class JailCog(commands.Cog):
             self.logger.info(f"Config not found for guild {message.guild.id}. Not throwing tomato.")
             return
 
-        # User is in jail: Throw tomato
-        try:
-            self.logger.info(f"Throwing tomato at message {message.id} in guild {message.guild.id}.")
-            await message.add_reaction(config.tomato_emoji)
-        except Exception:
-            self.logger.info(f"Failed to add tomato to message {message.id} in guild {message.guild.id}. Not throwing tomato.")
-            pass # Fail silently if permissions issue or emoji invalid
-
         # Check humilitation
         try:
             jail_data = JailedUser.get((JailedUser.server_id == message.guild.id) & (JailedUser.user_id == message.author.id))
         except JailedUser.DoesNotExist:
             return
 
+        should_throw_tomato = False
         if not jail_data.has_been_humiliated:
+            should_throw_tomato = True
             self.logger.info(f"User {message.author.id} is in jail and has not been humiliated. Humiliating...")
             jail_data.has_been_humiliated = True
             jail_data.save()
@@ -562,6 +557,18 @@ class JailCog(commands.Cog):
                     # Fallback if reply fails
                     self.logger.info(f"Failed to reply to message {message.id} in guild {message.guild.id}. Not humiliating.")
                     await message.channel.send(script.format(jailed_user=message.author.mention))
+        else:
+            if random.random() < config.subsequent_tomato_probability:
+                should_throw_tomato = True
+
+        if should_throw_tomato:
+            # User is in jail: Throw tomato
+            try:
+                self.logger.info(f"Throwing tomato at message {message.id} in guild {message.guild.id}.")
+                await message.add_reaction(config.tomato_emoji)
+            except Exception:
+                self.logger.info(f"Failed to add tomato to message {message.id} in guild {message.guild.id}. Not throwing tomato.")
+                pass # Fail silently if permissions issue or emoji invalid
 
     async def handle_name_change(self, message: discord.Message):
         if message.reference and message.reference.message_id:
