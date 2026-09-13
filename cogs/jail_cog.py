@@ -163,6 +163,7 @@ class JailCog(commands.Cog):
         self.cog_id = "JailCog"
         self.bot = bot
         self.logger = logging.getLogger(self.cog_id)
+        self.pending_bot_bets = {}
 
         self.db = self.bot.config_manager.open_peewee_store("jail_cog.db")
         db_proxy.initialize(self.db)
@@ -499,6 +500,12 @@ class JailCog(commands.Cog):
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
         if payload.user_id == self.bot.user.id:
             return
+
+        if payload.guild_id is None:
+            if payload.message_id in getattr(self, 'pending_bot_bets', {}):
+                if str(payload.emoji) == '👍':
+                    await self.handle_botbet_confirmation(payload)
+                return
 
         config = self.get_config(payload.guild_id)
         if config is None:
@@ -1411,4 +1418,102 @@ class JailCog(commands.Cog):
             message += f"{i}. <@{user_id}>: {count} BeanCoins\n"
             
         await ctx.send(message, allowed_mentions=discord.AllowedMentions.none())
+
+    @commands.command(name="botbet")
+    @commands.dm_only()
+    async def botbet_command(self, ctx: commands.Context, server_id: int, bet_thread_id: int, choice: str, amount: int):
+        guild = self.bot.get_guild(server_id)
+        if not guild:
+            await ctx.send("Server not found.")
+            return
+            
+        market = PredictionMarket.get_or_none(PredictionMarket.thread_id == bet_thread_id)
+        if not market:
+            await ctx.send("Prediction market not found for that thread ID.")
+            return
+            
+        if market.status != 'open':
+            await ctx.send(f"This market is currently {market.status}.")
+            return
+            
+        choices = json.loads(market.choices)
+        if choice.lower() not in [c.lower() for c in choices]:
+            await ctx.send(f"Invalid choice '{choice}'. Valid choices are: {', '.join(choices)}")
+            return
+            
+        thread = guild.get_thread(bet_thread_id)
+        if not thread:
+            thread = guild.get_channel(bet_thread_id)
+            
+        thread_name = thread.name if thread else f"Thread {bet_thread_id}"
+        
+        msg = await ctx.send(f"I will bet on the bet \"{thread_name}\" on choice \"{choice}\" for the amount of {amount}. React with 👍 to proceed.")
+        await msg.add_reaction("👍")
+        
+        self.pending_bot_bets[msg.id] = {
+            'server_id': server_id,
+            'thread_id': bet_thread_id,
+            'choice': choice.lower(),
+            'amount': amount,
+            'user_id': self.bot.user.id,
+            'ctx_channel_id': ctx.channel.id
+        }
+
+    async def handle_botbet_confirmation(self, payload: discord.RawReactionActionEvent):
+        bet_info = self.pending_bot_bets.get(payload.message_id)
+        if not bet_info:
+            return
+            
+        del self.pending_bot_bets[payload.message_id]
+        
+        market = PredictionMarket.get_or_none(PredictionMarket.thread_id == bet_info['thread_id'])
+        channel = self.bot.get_channel(bet_info['ctx_channel_id'])
+        if not channel:
+            user = self.bot.get_user(payload.user_id)
+            if user:
+                channel = await user.create_dm()
+                
+        if not market or market.status != 'open':
+            if channel:
+                await channel.send("The market is no longer open or could not be found.")
+            return
+
+        # Handle bean coin deduction
+        counter, _ = BeanCoinCounter.get_or_create(
+            server_id=market.server_id,
+            user_id=bet_info['user_id'],
+            defaults={'count': 0}
+        )
+
+        # Record the bet for the bot
+        existing_bet = MarketBet.get_or_none((MarketBet.market == market) & (MarketBet.user_id == bet_info['user_id']))
+        if existing_bet:
+            if existing_bet.choice != bet_info['choice']:
+                # Refund the old amount since we are replacing the bet
+                counter.count += existing_bet.amount
+                existing_bet.choice = bet_info['choice']
+                existing_bet.amount = bet_info['amount']
+            else:
+                existing_bet.amount += bet_info['amount']
+            existing_bet.timestamp = int(time.time() * 1000)
+            existing_bet.save()
+        else:
+            MarketBet.create(
+                market=market,
+                user_id=bet_info['user_id'],
+                choice=bet_info['choice'],
+                amount=bet_info['amount'],
+                timestamp=int(time.time() * 1000)
+            )
+
+        # Deduct the new amount added/set
+        counter.count -= bet_info['amount']
+        counter.save()
+            
+        thread = self.bot.get_channel(bet_info['thread_id'])
+        if thread:
+            await thread.send(f"Bet placed successfully on \"{bet_info['choice']}\" for {bet_info['amount']} BeanCoins!")
+        elif channel:
+            await channel.send(f"Bet placed successfully on \"{bet_info['choice']}\" for {bet_info['amount']} BeanCoins!")
+
 
